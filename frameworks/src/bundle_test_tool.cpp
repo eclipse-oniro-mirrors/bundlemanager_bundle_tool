@@ -8947,31 +8947,29 @@ ErrCode BundleTestTool::RunAsBatchGetAdditionalInfo()
         bundleNames);
     if (result != OHOS::ERR_OK) {
         resultReceiver_.append(HELP_MSG_BATCH_GET_ADDITIONAL_INFO);
-    } else {
-        std::string msg;
-        std::vector<BundleAdditionalInfo> additionalInfos;
-        result = bundleMgrProxy_->BatchGetAdditionalInfo(bundleNames, additionalInfos);
-        if (result == ERR_OK) {
-            nlohmann::json jsonResult = nlohmann::json::array();
-            for (const auto &additionalInfo : additionalInfos) {
-                nlohmann::json rowData;
-                rowData["bundleName"] = additionalInfo.bundleName;
-                if (additionalInfo.errCode == ERR_OK) {
-                    rowData["additionalInfo"] = additionalInfo.additionalInfo;
-                } else {
-                    rowData["errCode"] = additionalInfo.errCode;
-                }
-                jsonResult.push_back(rowData);
-            }
-            msg = jsonResult.dump() + "\n";
-            resultReceiver_.append(msg);
-        }   else {
-            resultReceiver_.append(STRING_BATCH_GET_ADDITIONAL_INFO_NG +
-                                   "errCode is " + std::to_string(result) +
-                                   "\n");
-        }
+        return result;
     }
-    return result;
+    std::vector<BundleAdditionalInfo> additionalInfos;
+    result = bundleMgrProxy_->BatchGetAdditionalInfo(bundleNames, additionalInfos);
+    if (result != ERR_OK) {
+        resultReceiver_.append(STRING_BATCH_GET_ADDITIONAL_INFO_NG +
+                               "errCode is " + std::to_string(result) + "\n");
+        return result;
+    }
+    nlohmann::json jsonResult = nlohmann::json::array();
+    for (size_t i = 0; i < additionalInfos.size(); ++i) {
+        const BundleAdditionalInfo &additionalInfo = additionalInfos[i];
+        nlohmann::json rowData;
+        rowData["bundleName"] = additionalInfo.bundleName;
+        if (additionalInfo.errCode == ERR_OK) {
+            rowData["additionalInfo"] = additionalInfo.additionalInfo;
+        } else {
+            rowData["errCode"] = additionalInfo.errCode;
+        }
+        jsonResult.push_back(rowData);
+    }
+    resultReceiver_.append(jsonResult.dump() + "\n");
+    return ERR_OK;
 }
 
 ErrCode BundleTestTool::RunAsGetAdditionalInfoForAllUser()
