@@ -8957,8 +8957,7 @@ ErrCode BundleTestTool::RunAsBatchGetAdditionalInfo()
         return result;
     }
     nlohmann::json jsonResult = nlohmann::json::array();
-    for (size_t i = 0; i < additionalInfos.size(); ++i) {
-        const BundleAdditionalInfo &additionalInfo = additionalInfos[i];
+    for (const auto &additionalInfo : additionalInfos) {
         nlohmann::json rowData;
         rowData["bundleName"] = additionalInfo.bundleName;
         if (additionalInfo.errCode == ERR_OK) {
@@ -8980,27 +8979,28 @@ ErrCode BundleTestTool::RunAsGetAdditionalInfoForAllUser()
     int32_t counter = 0;
     std::string name = "";
     std::string bundleName = "";
-    while (true) {
+    int32_t option = 0;
+    while ((option = getopt_long(argc_, argv_, SHORT_OPTIONS_GET_ADDITIONAL_INFO_FOR_ALL_USER.c_str(),
+        LONG_OPTIONS_GET_ADDITIONAL_INFO_FOR_ALL_USER, nullptr)) != -1) {
         counter++;
-        int32_t option = getopt_long(argc_, argv_, SHORT_OPTIONS_GET_ADDITIONAL_INFO_FOR_ALL_USER.c_str(),
-            LONG_OPTIONS_GET_ADDITIONAL_INFO_FOR_ALL_USER, nullptr);
         APP_LOGD("option: %{public}d, optopt: %{public}d, optind: %{public}d", option, optopt, optind);
         if (optind < 0 || optind > argc_) {
             return OHOS::ERR_INVALID_VALUE;
-        }
-        if (option == -1) {
-            // When scanning the first argument
-            if ((counter == 1) && (strcmp(argv_[optind], cmd_.c_str()) == 0)) {
-                APP_LOGD("bundle_test_tool getAdditionalInfoForAllUser with no option.");
-                resultReceiver_.append(HELP_MSG_GET_ADDITIONAL_INFO_FOR_ALL_USER);
-                return OHOS::ERR_INVALID_VALUE;
-            }
-            break;
         }
         int temp = 0;
         result = !CheckGetStringCorrectOption(option, commandName, temp, name)
             ? OHOS::ERR_INVALID_VALUE : result;
         bundleName = option == 'n' ? name : bundleName;
+    }
+    if ((option == -1) && (counter == 0)) {
+        if (optind < 0 || optind > argc_) {
+            return OHOS::ERR_INVALID_VALUE;
+        }
+        if (strcmp(argv_[optind], cmd_.c_str()) == 0) {
+            APP_LOGD("bundle_test_tool getAdditionalInfoForAllUser with no option.");
+            resultReceiver_.append(HELP_MSG_GET_ADDITIONAL_INFO_FOR_ALL_USER);
+            return OHOS::ERR_INVALID_VALUE;
+        }
     }
     APP_LOGI("bundleName: %{public}s", bundleName.c_str());
     if (result != OHOS::ERR_OK) {
