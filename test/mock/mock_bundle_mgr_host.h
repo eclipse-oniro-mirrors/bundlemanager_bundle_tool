@@ -27,9 +27,6 @@ class MockBundleMgrHost : public BundleMgrHost {
 public:
     static void SetGetBundleInfosReturn(bool result);
     static void SetGetBundleStatsFailSecondBundle(bool enable);
-    static void SetBatchGetAdditionalInfoResult(ErrCode result);
-    static void SetBatchGetAdditionalInfoFailSecondBundle(bool enable);
-    static void SetGetAdditionalInfoForAllUserResult(ErrCode result);
 
     ErrCode CleanBundleCacheFiles(const std::string &bundleName, const sptr<ICleanCacheCallback> cleanCacheCallback,
         int32_t userId = Constants::UNSPECIFIED_USERID, int32_t appIndex = 0) override;
@@ -48,9 +45,6 @@ public:
         int32_t appIndex = 0, uint32_t statFlag = 0) override;
     ErrCode GetBundleStatsAsync(const std::string &bundleName, int32_t userId, int32_t appIndex,
         uint32_t statFlag, const sptr<IBundleStatsCallback> &callback) override;
-    ErrCode BatchGetAdditionalInfo(const std::vector<std::string> &bundleNames,
-        std::vector<BundleAdditionalInfo> &additionalInfos) override;
-    ErrCode GetAdditionalInfoForAllUser(const std::string &bundleName, std::string &additionalInfo) override;
 };
 }  // namespace AppExecFwk
 }  // namespace OHOS
