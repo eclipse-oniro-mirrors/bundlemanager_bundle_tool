@@ -31,6 +31,7 @@ const std::string TOOL_NAME = "ohos-bm";
 const std::string HELP_MSG = "usage: ohos-bm <command> <options>\n"
                              "These are common ohos-bm commands list:\n"
                              "  --help            list available commands\n"
+                             "  install           install a bundle with options\n"
                              "  uninstall         uninstall a bundle with options\n"
                              "  dump              dump the bundle info\n"
                              "  dump-dependencies dump dependencies by given bundle name and module name\n"
@@ -51,6 +52,17 @@ const std::string HELP_MSG_UNINSTALL =
     "  --keepData                      keep the user data after uninstall\n"
     "  --shared                         uninstall inter-application shared library\n"
     "  --version                        uninstall a inter-application shared library by versionCode\n";
+
+const std::string HELP_MSG_INSTALL =
+    "usage: ohos-bm install <options>\n"
+    "options list:\n"
+    "  --help                                      list available commands\n"
+    "  --bundlePath <file-path>                    install a hap or hsp or app by a specified path\n"
+    "  --replace                                   replace an existing bundle\n"
+    "  --userId <user-id>                          specify a user id, only supports current user or userId is 0\n"
+    "  --waittingTime <waitting-time>              specify waitting time for installation,\n"
+    "                                                the minimum waitting time is 180s,\n"
+    "                                                the maximum waitting time is 600s\n";
 
 const std::string HELP_MSG_DUMP =
     "usage: ohos-bm dump <options>\n"
@@ -104,8 +116,14 @@ const std::string HELP_MSG_NO_OPTION =
 const std::string HELP_MSG_NO_BUNDLE_NAME_OPTION =
     "error: you must specify a bundle name with --bundleName.";
 
+const std::string HELP_MSG_NO_BUNDLE_PATH_OPTION =
+    "error: you must specify a bundle path with --bundlePath.";
+
 const std::string STRING_UNINSTALL_BUNDLE_OK = "uninstall bundle successfully.";
 const std::string STRING_UNINSTALL_BUNDLE_NG = "error: failed to uninstall bundle.";
+
+const std::string STRING_INSTALL_BUNDLE_OK = "install bundle successfully.";
+const std::string STRING_INSTALL_BUNDLE_NG = "error: failed to install bundle.";
 
 const std::string HELP_MSG_NO_DATA_OR_CACHE_OPTION =
     "error: you must specify --cache or --data for 'ohos-bm clean' option.";
@@ -239,6 +257,7 @@ private:
     ErrCode InitAppControlProxy();
 
     ErrCode RunAsHelpCommand();
+    ErrCode RunAsInstallCommand();
     ErrCode RunAsUninstallCommand();
     ErrCode RunAsDumpCommand();
     ErrCode RunAsPublicDumpCommand();
@@ -255,6 +274,11 @@ private:
     int32_t UninstallOperation(const std::string &bundleName,
                                InstallParam &installParam) const;
     int32_t UninstallSharedOperation(const UninstallParam &uninstallParam) const;
+    int32_t InstallOperation(const std::vector<std::string> &bundlePaths,
+        InstallParam &installParam, int32_t waittingTime, std::string &resultMsg) const;
+    ErrCode GetBundlePath(const std::string &param, std::vector<std::string> &bundlePaths) const;
+    void GetAbsPaths(const std::vector<std::string> &paths, std::vector<std::string> &absPaths) const;
+    bool IsInstallOption(int index) const;
     int32_t RecoverOperation(const std::string &bundleName, InstallParam &installParam) const;
     ErrCode CreateCliSandboxAppOperation(const std::string &creatorBundleName,
         const std::string &envCreatorBundleName, const std::string &bundleName, int32_t userId,

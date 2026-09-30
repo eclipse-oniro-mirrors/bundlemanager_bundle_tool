@@ -9,7 +9,7 @@
         "type": "object",
         "description": "View information about ohos-bm subcommands",
         "properties": {
-            "help" : {
+            "help": {
                 "type": "boolean",
                 "default": false
             }
@@ -41,6 +41,70 @@
         }
     },
     "subcommands": {
+        "install": {
+            "description": "Install an application package",
+            "requirePermissions": [
+                "ohos.permission.ALLOW_INSTALL_DEBUG_HAP"
+            ],
+            "inputSchema": {
+                "type": "object",
+                "required": [
+                    "bundlePath"
+                ],
+                "properties": {
+                    "help": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "bundlePath": {
+                        "type": "array",
+                        "description": "Bundle file paths to install",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "replace": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "userId": {
+                        "type": "integer",
+                        "description": "Specify user id, only supports current user or userId is 0",
+                        "default": 0
+                    },
+                    "waittingTime": {
+                        "type": "integer",
+                        "description": "Waitting time for installation in seconds, range [180, 600]",
+                        "default": 180
+                    }
+                }
+            },
+            "outputSchema": {
+                "type": "object",
+                "description": "Execution result",
+                "properties": {
+                    "type": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "data": {
+                        "type": "object",
+                        "properties": {}
+                    },
+                    "errCode": {
+                        "type": "string"
+                    },
+                    "errMsg": {
+                        "type": "string"
+                    },
+                    "suggestion": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "uninstall": {
             "description": "Uninstall an application package",
             "requirePermissions": [

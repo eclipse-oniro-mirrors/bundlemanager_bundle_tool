@@ -14,6 +14,7 @@
  */
 #include "bundle_command.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -23,6 +24,7 @@
 #include <vector>
 #include "app_log_wrapper.h"
 #include "app_mgr_client.h"
+#include "appexecfwk_errors.h"
 #include "bundle_command_common.h"
 #include "bundle_death_recipient.h"
 #include "bundle_mgr_client.h"
@@ -41,6 +43,19 @@ namespace AppExecFwk {
 namespace {
 const int32_t INDEX_OFFSET = 2;
 const int32_t INVALID_ARGS_NUMBER = 2;
+
+const int32_t MINIMUM_WAITTING_TIME = 180; // 3 mins
+const int32_t MAXIMUM_WAITTING_TIME = 600; // 10 mins
+
+const std::string INSTALL_OPTIONS = "hp:ru:w";
+const struct option INSTALL_LONG_OPTIONS[] = {
+    {"help", no_argument, nullptr, 'h'},
+    {"bundlePath", required_argument, nullptr, 'p'},
+    {"replace", no_argument, nullptr, 'r'},
+    {"userId", required_argument, nullptr, 'u'},
+    {"waittingTime", required_argument, nullptr, 'w'},
+    {nullptr, 0, nullptr, 0},
+};
 
 const std::string UNINSTALL_OPTIONS = "hn:kv:s";
 const struct option UNINSTALL_LONG_OPTIONS[] = {
@@ -284,6 +299,7 @@ ErrCode BundleManagerShellCommand::CreateCommandMap()
 {
     commandMap_ = {
         {"--help", [this] { return this->RunAsHelpCommand(); } },
+        {"install", [this] { return this->RunAsInstallCommand(); } },
         {"uninstall", [this] { return this->RunAsUninstallCommand(); } },
         {"dump", [this] { return this->RunAsDumpCommand(); } },
         {"public-dump", [this] { return this->RunAsPublicDumpCommand(); } },
@@ -352,6 +368,195 @@ ErrCode BundleManagerShellCommand::RunAsHelpCommand()
 {
     resultReceiver_ = HELP_MSG;
     return OHOS::ERR_OK;
+}
+
+ErrCode BundleManagerShellCommand::RunAsInstallCommand()
+{
+    APP_LOGI("begin to RunAsInstallCommand");
+
+    // Return error when no arguments provided
+    if (argc_ <= 2) {
+        APP_LOGD("'ohos-bm install' with no option.");
+        resultReceiver_ = CreateErrorResult(IStatusReceiver::ERR_INSTALL_PARAM_ERROR, HELP_MSG_NO_OPTION);
+        return OHOS::ERR_INVALID_VALUE;
+    }
+
+    // install 命令需要 installer proxy
+    if (InitInstaller() != OHOS::ERR_OK) {
+        resultReceiver_ = CreateErrorResult(ERR_APPEXECFWK_SERVICE_INTERNAL_ERROR,
+            "error: failed to connect to bundle installer service.");
+        return OHOS::ERR_INVALID_VALUE;
+    }
+
+    int result = OHOS::ERR_OK;
+    InstallFlag installFlag = InstallFlag::REPLACE_EXISTING;
+    std::vector<std::string> bundlePath;
+    int index = 0;
+    const int32_t currentUser = BundleCommandCommon::GetCurrentUserId(Constants::UNSPECIFIED_USERID);
+    int32_t userId = currentUser;
+    int32_t waittingTime = MINIMUM_WAITTING_TIME;
+    while (true) {
+        int32_t option = getopt_long(argc_, argv_, INSTALL_OPTIONS.c_str(), INSTALL_LONG_OPTIONS, nullptr);
+        APP_LOGD("option: %{public}d, optopt: %{public}d, optind: %{public}d", option, optopt, optind);
+        if (optind < 0 || optind > argc_) {
+            return OHOS::ERR_INVALID_VALUE;
+        }
+        if (option == -1) {
+            break;
+        }
+
+        if (option == '?') {
+            switch (optopt) {
+                case 'p': {
+                    // 'ohos-bm install -p' with no argument
+                    APP_LOGD("'ohos-bm install -p' with no argument.");
+                    resultReceiver_ = CreateErrorResult(
+                        IStatusReceiver::ERR_INSTALL_PARAM_ERROR, STRING_REQUIRE_CORRECT_VALUE);
+                    result = OHOS::ERR_INVALID_VALUE;
+                    break;
+                }
+                case 'u': {
+                    // 'ohos-bm install -u' with no argument
+                    APP_LOGD("'ohos-bm install -u' with no argument.");
+                    resultReceiver_ = CreateErrorResult(
+                        IStatusReceiver::ERR_INSTALL_PARAM_ERROR, STRING_REQUIRE_CORRECT_VALUE);
+                    result = OHOS::ERR_INVALID_VALUE;
+                    break;
+                }
+                case 'w': {
+                    // 'ohos-bm install -w' with no argument
+                    APP_LOGD("'ohos-bm install -w' with no argument.");
+                    resultReceiver_ = CreateErrorResult(
+                        IStatusReceiver::ERR_INSTALL_PARAM_ERROR, STRING_REQUIRE_CORRECT_VALUE);
+                    result = OHOS::ERR_INVALID_VALUE;
+                    break;
+                }
+                default: {
+                    std::string unknownOption = "";
+                    std::string unknownOptionMsg = GetUnknownOptionMsg(unknownOption);
+                    APP_LOGD("'ohos-bm install' with an unknown option.");
+                    resultReceiver_ = CreateErrorResult(
+                        IStatusReceiver::ERR_INSTALL_PARAM_ERROR, unknownOptionMsg);
+                    result = OHOS::ERR_INVALID_VALUE;
+                    break;
+                }
+            }
+            break;
+        }
+
+        switch (option) {
+            case 'h': {
+                // 'ohos-bm install -h'
+                APP_LOGD("'ohos-bm install -h'");
+                resultReceiver_ = HELP_MSG_INSTALL;
+                result = OHOS::ERR_INVALID_VALUE;
+                break;
+            }
+            case 'p': {
+                // 'ohos-bm install -p <bundle-file-path>'
+                APP_LOGD("'ohos-bm install -p'");
+                if (GetBundlePath(optarg, bundlePath) != OHOS::ERR_OK) {
+                    APP_LOGD("'ohos-bm install -p' with no argument.");
+                    resultReceiver_ = CreateErrorResult(
+                        IStatusReceiver::ERR_INSTALL_PARAM_ERROR, STRING_REQUIRE_CORRECT_VALUE);
+                    return OHOS::ERR_INVALID_VALUE;
+                }
+                index = optind;
+                break;
+            }
+            case 'r': {
+                // 'ohos-bm install -r'
+                APP_LOGD("'ohos-bm install -r'");
+                installFlag = InstallFlag::REPLACE_EXISTING;
+                break;
+            }
+            case 'u': {
+                // 'ohos-bm install -u <user-id>'
+                APP_LOGD("'ohos-bm install -u'");
+                APP_LOGW("'ohos-bm install -u only support user 0'");
+                if (!OHOS::StrToInt(optarg, userId) || userId < 0) {
+                    APP_LOGE("ohos-bm install with error userId %{private}s", optarg);
+                    resultReceiver_ = CreateErrorResult(
+                        IStatusReceiver::ERR_INSTALL_PARAM_ERROR, STRING_REQUIRE_CORRECT_VALUE);
+                    return OHOS::ERR_INVALID_VALUE;
+                }
+                if (userId != Constants::DEFAULT_USERID && !BundleCommandCommon::IsUserForeground(userId)) {
+                    APP_LOGW("install the bundle for current user %{public}d", currentUser);
+                    userId = BundleCommandCommon::GetCurrentUserId(Constants::UNSPECIFIED_USERID);
+                }
+                break;
+            }
+            case 'w': {
+                // 'ohos-bm install -w <waitting-time>'
+                APP_LOGD("'ohos-bm install -w'");
+                if (!OHOS::StrToInt(optarg, waittingTime) || waittingTime < MINIMUM_WAITTING_TIME ||
+                    waittingTime > MAXIMUM_WAITTING_TIME) {
+                    APP_LOGE("ohos-bm install with error waittingTime %{private}s", optarg);
+                    resultReceiver_ = CreateErrorResult(
+                        IStatusReceiver::ERR_INSTALL_PARAM_ERROR, STRING_REQUIRE_CORRECT_VALUE);
+                    return OHOS::ERR_INVALID_VALUE;
+                }
+                break;
+            }
+            default: {
+                result = OHOS::ERR_INVALID_VALUE;
+                break;
+            }
+        }
+    }
+
+    // hap path list
+    for (; index < argc_ && index >= INDEX_OFFSET; ++index) {
+        if (IsInstallOption(index)) {
+            break;
+        }
+        if (GetBundlePath(argList_[index - INDEX_OFFSET], bundlePath) != OHOS::ERR_OK) {
+            bundlePath.clear();
+            APP_LOGD("'ohos-bm install' with error arguments.");
+            resultReceiver_ = CreateErrorResult(
+                IStatusReceiver::ERR_INSTALL_PARAM_ERROR, STRING_REQUIRE_CORRECT_VALUE);
+            result = OHOS::ERR_INVALID_VALUE;
+        }
+    }
+
+    for (auto &path : bundlePath) {
+        APP_LOGD("install hap path %{private}s", path.c_str());
+    }
+
+    if (result == OHOS::ERR_OK) {
+        if (resultReceiver_ == "" && bundlePath.empty()) {
+            // 'ohos-bm install ...' with no bundle path option
+            APP_LOGD("'ohos-bm install' with no bundle path option.");
+            resultReceiver_ = CreateErrorResult(
+                IStatusReceiver::ERR_INSTALL_PARAM_ERROR, HELP_MSG_NO_BUNDLE_PATH_OPTION);
+            result = OHOS::ERR_INVALID_VALUE;
+        }
+    }
+
+    if (result != OHOS::ERR_OK) {
+        if (resultReceiver_ == "") {
+            resultReceiver_ = CreateErrorResult(IStatusReceiver::ERR_INSTALL_PARAM_ERROR, HELP_MSG_INSTALL);
+        }
+        return result;
+    }
+
+    InstallParam installParam;
+    installParam.installFlag = installFlag;
+    installParam.userId = userId;
+    std::string resultMsg;
+    int32_t installResult = InstallOperation(bundlePath, installParam, waittingTime, resultMsg);
+    if (installResult == OHOS::ERR_OK) {
+        if (!resultMsg.empty() && resultMsg[0] != '[') {
+            resultReceiver_ = CreateSuccessResult(resultMsg);
+        } else {
+            resultReceiver_ = CreateSuccessResult();
+        }
+    } else {
+        resultReceiver_ = CreateErrorResult(installResult, STRING_INSTALL_BUNDLE_NG);
+        result = installResult;
+    }
+    APP_LOGI("end");
+    return result;
 }
 
 ErrCode BundleManagerShellCommand::RunAsUninstallCommand()
@@ -1305,6 +1510,111 @@ bool BundleManagerShellCommand::CleanBundleDataFilesOperation(const std::string 
 }
 
 // Common helper methods
+
+ErrCode BundleManagerShellCommand::GetBundlePath(const std::string &param,
+    std::vector<std::string> &bundlePaths) const
+{
+    if (param.empty()) {
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    if (param == "-r" || param == "--replace" || param == "-p" ||
+        param == "--bundlePath" || param == "-u" || param == "--userId" ||
+        param == "-w" || param == "--waittingTime") {
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    bundlePaths.emplace_back(param);
+    return OHOS::ERR_OK;
+}
+
+void BundleManagerShellCommand::GetAbsPaths(
+    const std::vector<std::string> &paths, std::vector<std::string> &absPaths) const
+{
+    std::vector<std::string> realPathVec;
+    for (auto &bundlePath : paths) {
+        std::string absoluteBundlePath = "";
+        if (bundlePath.empty()) {
+            continue;
+        }
+        if (bundlePath.at(0) == '/') {
+            // absolute path
+            absoluteBundlePath.append(bundlePath);
+        } else {
+            // relative path
+            char *currentPathPtr = getcwd(nullptr, 0);
+            if (currentPathPtr != nullptr) {
+                absoluteBundlePath.append(currentPathPtr);
+                absoluteBundlePath.append('/' + bundlePath);
+                free(currentPathPtr);
+                currentPathPtr = nullptr;
+            }
+        }
+        realPathVec.emplace_back(absoluteBundlePath);
+    }
+
+    for (const auto &path : realPathVec) {
+        if (std::find(absPaths.begin(), absPaths.end(), path) == absPaths.end()) {
+            absPaths.emplace_back(path);
+        }
+    }
+}
+
+bool BundleManagerShellCommand::IsInstallOption(int index) const
+{
+    if (index >= argc_ || index < INDEX_OFFSET) {
+        return false;
+    }
+    if (argList_[index - INDEX_OFFSET] == "-r" || argList_[index - INDEX_OFFSET] == "--replace" ||
+        argList_[index - INDEX_OFFSET] == "-p" || argList_[index - INDEX_OFFSET] == "--bundlePath" ||
+        argList_[index - INDEX_OFFSET] == "-u" || argList_[index - INDEX_OFFSET] == "--userId" ||
+        argList_[index - INDEX_OFFSET] == "-w" || argList_[index - INDEX_OFFSET] == "--waittingTime") {
+        return true;
+    }
+    return false;
+}
+
+int32_t BundleManagerShellCommand::InstallOperation(const std::vector<std::string> &bundlePaths,
+    InstallParam &installParam, int32_t waittingTime, std::string &resultMsg) const
+{
+    std::vector<std::string> pathVec;
+    GetAbsPaths(bundlePaths, pathVec);
+
+    sptr<StatusReceiverImpl> statusReceiver(new (std::nothrow) StatusReceiverImpl(waittingTime));
+    if (statusReceiver == nullptr) {
+        APP_LOGE("statusReceiver is null");
+        return IStatusReceiver::ERR_UNKNOWN;
+    }
+
+    sptr<BundleDeathRecipient> recipient(new (std::nothrow) BundleDeathRecipient(statusReceiver));
+    if (recipient == nullptr) {
+        APP_LOGE("recipient is null");
+        return IStatusReceiver::ERR_UNKNOWN;
+    }
+    bundleInstallerProxy_->AsObject()->AddDeathRecipient(recipient);
+
+    ErrCode res = bundleInstallerProxy_->StreamInstall(pathVec, installParam, statusReceiver);
+    APP_LOGD("StreamInstall result is %{public}d", res);
+    if (res == ERR_OK) {
+        resultMsg = statusReceiver->GetResultMsg();
+        return statusReceiver->GetResultCode();
+    }
+    if (res == ERR_APPEXECFWK_INSTALL_PARAM_ERROR) {
+        APP_LOGE("install param error");
+        return IStatusReceiver::ERR_INSTALL_PARAM_ERROR;
+    }
+    if (res == ERR_APPEXECFWK_INSTALL_INTERNAL_ERROR) {
+        APP_LOGE("install internal error");
+        return IStatusReceiver::ERR_INSTALL_INTERNAL_ERROR;
+    }
+    if (res == ERR_APPEXECFWK_INSTALL_FILE_PATH_INVALID) {
+        APP_LOGE("install invalid path");
+        return IStatusReceiver::ERR_INSTALL_FILE_PATH_INVALID;
+    }
+    if (res == ERR_APPEXECFWK_INSTALL_DISK_MEM_INSUFFICIENT) {
+        APP_LOGE("install failed due to no space left");
+        return IStatusReceiver::ERR_INSTALL_DISK_MEM_INSUFFICIENT;
+    }
+    return res;
+}
 
 int32_t BundleManagerShellCommand::UninstallOperation(
     const std::string &bundleName, InstallParam &installParam) const
