@@ -25,9 +25,15 @@ const std::string SECOND_BUNDLE_NAME = "com.example.bundle.two";
 constexpr int32_t CACHE_STATS_INDEX = 4;
 constexpr int64_t CACHE_SIZE_ONE = 100;
 constexpr int64_t CACHE_SIZE_TWO = 200;
+const std::string ADDITIONAL_INFO_ONE = "additionalInfoOne";
+const std::string ADDITIONAL_INFO_TWO = "additionalInfoTwo";
+const std::string ADDITIONAL_INFO_ALL_USER = "additionalInfoForAllUser";
 
 bool g_getBundleInfosResult = true;
 bool g_getBundleStatsFailSecondBundle = false;
+ErrCode g_batchGetAdditionalInfoResult = ERR_OK;
+bool g_batchGetAdditionalInfoFailSecondBundle = false;
+ErrCode g_getAdditionalInfoForAllUserResult = ERR_OK;
 } // namespace
 
 void MockBundleMgrHost::SetGetBundleInfosReturn(bool result)
@@ -38,6 +44,21 @@ void MockBundleMgrHost::SetGetBundleInfosReturn(bool result)
 void MockBundleMgrHost::SetGetBundleStatsFailSecondBundle(bool enable)
 {
     g_getBundleStatsFailSecondBundle = enable;
+}
+
+void MockBundleMgrHost::SetBatchGetAdditionalInfoResult(ErrCode result)
+{
+    g_batchGetAdditionalInfoResult = result;
+}
+
+void MockBundleMgrHost::SetBatchGetAdditionalInfoFailSecondBundle(bool enable)
+{
+    g_batchGetAdditionalInfoFailSecondBundle = enable;
+}
+
+void MockBundleMgrHost::SetGetAdditionalInfoForAllUserResult(ErrCode result)
+{
+    g_getAdditionalInfoForAllUserResult = result;
 }
 
 bool MockBundleMgrHost::DumpInfos(
@@ -149,6 +170,45 @@ ErrCode MockBundleMgrHost::GetBundleStatsAsync(const std::string &bundleName, in
         bundleStats[CACHE_STATS_INDEX] = CACHE_SIZE_TWO;
     }
     callback->OnGetBundleStatsFinished(ERR_OK, bundleStats);
+    return ERR_OK;
+}
+
+ErrCode MockBundleMgrHost::BatchGetAdditionalInfo(const std::vector<std::string> &bundleNames,
+    std::vector<BundleAdditionalInfo> &additionalInfos)
+{
+    APP_LOGD("enter");
+    if (bundleNames.empty()) {
+        return ERR_BUNDLE_MANAGER_PARAM_ERROR;
+    }
+    if (g_batchGetAdditionalInfoResult != ERR_OK) {
+        return g_batchGetAdditionalInfoResult;
+    }
+
+    additionalInfos.clear();
+    for (const auto &bundleName : bundleNames) {
+        BundleAdditionalInfo info;
+        info.bundleName = bundleName;
+        if (g_batchGetAdditionalInfoFailSecondBundle && bundleName == SECOND_BUNDLE_NAME) {
+            info.errCode = ERR_BUNDLE_MANAGER_BUNDLE_NOT_EXIST;
+        } else {
+            info.additionalInfo = bundleName == SECOND_BUNDLE_NAME ? ADDITIONAL_INFO_TWO : ADDITIONAL_INFO_ONE;
+        }
+        additionalInfos.emplace_back(info);
+    }
+    return ERR_OK;
+}
+
+ErrCode MockBundleMgrHost::GetAdditionalInfoForAllUser(const std::string &bundleName, std::string &additionalInfo)
+{
+    APP_LOGD("enter");
+    APP_LOGD("bundleName: %{public}s", bundleName.c_str());
+    if (bundleName.empty()) {
+        return ERR_BUNDLE_MANAGER_PARAM_ERROR;
+    }
+    if (g_getAdditionalInfoForAllUserResult != ERR_OK) {
+        return g_getAdditionalInfoForAllUserResult;
+    }
+    additionalInfo = ADDITIONAL_INFO_ALL_USER;
     return ERR_OK;
 }
 }  // namespace AppExecFwk

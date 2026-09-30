@@ -261,9 +261,9 @@ static const std::string HELP_MSG =
     "  isBundleInstalled                determine whether the bundle is installed based on bundleName user "
     "and appIndex\n"
     "  getCompatibleDeviceType          obtain the compatible device type based on bundleName\n"
-    "  getAdditionalInfoForAllUser        obtain the additional info of the bundle on all users\n"
+    "  getAdditionalInfoForAllUser      obtain the additional info of the bundle on all users\n"
     "  batchGetCompatibleDeviceType     batch obtain the compatible device types based on bundleNames\n"
-    "  batchGetAdditionalInfo            batch obtain the additional infos based on bundleNames\n"
+    "  batchGetAdditionalInfo           batch obtain the additional infos based on bundleNames\n"
     "  getSimpleAppInfoForUid           get bundlename list and appIndex list by uid list\n"
     "  getBundleNameByAppId             get bundlename by appid or appIdentifier\n"
     "  getAssetAccessGroups             get asset access groups by bundlename\n"
@@ -2246,12 +2246,12 @@ ErrCode BundleTestTool::CreateCommandMap()
             std::bind(&BundleTestTool::RunAsIsBundleInstalled, this)},
         {"getCompatibleDeviceType",
             std::bind(&BundleTestTool::RunAsGetCompatibleDeviceType, this)},
+        {"getAdditionalInfoForAllUser",
+            std::bind(&BundleTestTool::RunAsGetAdditionalInfoForAllUser, this)},
         {"batchGetCompatibleDeviceType",
             std::bind(&BundleTestTool::RunAsBatchGetCompatibleDeviceType, this)},
         {"batchGetAdditionalInfo",
             std::bind(&BundleTestTool::RunAsBatchGetAdditionalInfo, this)},
-        {"getAdditionalInfoForAllUser",
-            std::bind(&BundleTestTool::RunAsGetAdditionalInfoForAllUser, this)},
         {"getSimpleAppInfoForUid",
             std::bind(&BundleTestTool::RunAsGetSimpleAppInfoForUid, this)},
         {"getBundleNameByAppId",
@@ -8992,8 +8992,8 @@ ErrCode BundleTestTool::RunAsGetAdditionalInfoForAllUser()
             ? OHOS::ERR_INVALID_VALUE : result;
         bundleName = option == 'n' ? name : bundleName;
     }
-    if ((option == -1) && (counter == 0)) {
-        if (optind < 0 || optind > argc_) {
+    if (counter == 0) {
+        if (optind < 0 || optind >= argc_ || argv_[optind] == nullptr) {
             return OHOS::ERR_INVALID_VALUE;
         }
         if (strcmp(argv_[optind], cmd_.c_str()) == 0) {
@@ -9003,6 +9003,9 @@ ErrCode BundleTestTool::RunAsGetAdditionalInfoForAllUser()
         }
     }
     APP_LOGI("bundleName: %{public}s", bundleName.c_str());
+    if (result == OHOS::ERR_OK && (bundleName.empty())) {
+        result = OHOS::ERR_INVALID_VALUE;
+    }
     if (result != OHOS::ERR_OK) {
         resultReceiver_.append(HELP_MSG_GET_ADDITIONAL_INFO_FOR_ALL_USER);
     } else {
