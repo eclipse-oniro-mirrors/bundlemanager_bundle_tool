@@ -183,6 +183,7 @@ HWTEST_F(BundleTestToolAdditionalInfoTest, Bundle_Test_Tool_Batch_Get_Additional
 
     EXPECT_NE(result, OHOS::ERR_OK);
     EXPECT_NE(cmd.resultReceiver_.find("usage: bundle_test_tool batchGetAdditionalInfo"), std::string::npos);
+    EXPECT_NE(cmd.resultReceiver_.find("specify bundle name of the application, required"), std::string::npos);
 }
 
 /**
@@ -261,6 +262,8 @@ HWTEST_F(BundleTestToolAdditionalInfoTest, Bundle_Test_Tool_Get_Additional_Info_
 
     EXPECT_NE(result, OHOS::ERR_OK);
     EXPECT_NE(cmd.resultReceiver_.find("usage: bundle_test_tool getAdditionalInfoForAllUser"), std::string::npos);
+    EXPECT_NE(cmd.resultReceiver_.find("root identity is required"), std::string::npos);
+    EXPECT_NE(cmd.resultReceiver_.find("specify bundle name of the application, required"), std::string::npos);
     EXPECT_EQ(cmd.resultReceiver_.find("getAdditionalInfoForAllUser successfully"), std::string::npos);
 }
 
@@ -288,5 +291,60 @@ HWTEST_F(BundleTestToolAdditionalInfoTest, Bundle_Test_Tool_Get_Additional_Info_
     EXPECT_EQ(result, OHOS::ERR_INVALID_VALUE);
     EXPECT_NE(cmd.resultReceiver_.find("usage: bundle_test_tool getAdditionalInfoForAllUser"), std::string::npos);
     EXPECT_EQ(cmd.resultReceiver_.find("getAdditionalInfoForAllUser successfully"), std::string::npos);
+}
+
+/**
+ * @tc.number: Bundle_Test_Tool_Batch_Get_Additional_Info_0500
+ * @tc.name: RunAsBatchGetAdditionalInfo
+ * @tc.desc: Verify RunAsBatchGetAdditionalInfo returns invalid value instead of crashing
+ *           when the bundle mgr proxy is null.
+ */
+HWTEST_F(BundleTestToolAdditionalInfoTest, Bundle_Test_Tool_Batch_Get_Additional_Info_0500,
+    Function | MediumTest | TestSize.Level1)
+{
+    optind = 0;
+    char *argv[] = {
+        const_cast<char*>("bundle_test_tool"),
+        const_cast<char*>("batchGetAdditionalInfo"),
+        const_cast<char*>("-n"),
+        const_cast<char*>("com.example.bundle.one"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleTestTool cmd(argc, argv);
+    sptr<IBundleMgr> nullProxy;
+    cmd.bundleMgrProxy_ = nullProxy;
+
+    ErrCode result = cmd.RunAsBatchGetAdditionalInfo();
+
+    EXPECT_EQ(result, OHOS::ERR_INVALID_VALUE);
+    EXPECT_EQ(cmd.resultReceiver_.find("batchGetAdditionalInfo failed"), std::string::npos);
+}
+
+/**
+ * @tc.number: Bundle_Test_Tool_Get_Additional_Info_For_All_User_0500
+ * @tc.name: RunAsGetAdditionalInfoForAllUser
+ * @tc.desc: Verify RunAsGetAdditionalInfoForAllUser returns invalid value instead of crashing
+ *           when the bundle mgr proxy is null.
+ */
+HWTEST_F(BundleTestToolAdditionalInfoTest, Bundle_Test_Tool_Get_Additional_Info_For_All_User_0500,
+    Function | MediumTest | TestSize.Level1)
+{
+    optind = 0;
+    char *argv[] = {
+        const_cast<char*>("bundle_test_tool"),
+        const_cast<char*>("getAdditionalInfoForAllUser"),
+        const_cast<char*>("-n"),
+        const_cast<char*>("com.example.bundle.one"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleTestTool cmd(argc, argv);
+    sptr<IBundleMgr> nullProxy;
+    cmd.bundleMgrProxy_ = nullProxy;
+
+    ErrCode result = cmd.RunAsGetAdditionalInfoForAllUser();
+
+    EXPECT_EQ(result, OHOS::ERR_INVALID_VALUE);
+    EXPECT_EQ(cmd.resultReceiver_.find("getAdditionalInfoForAllUser successfully"), std::string::npos);
+    EXPECT_EQ(cmd.resultReceiver_.find("getAdditionalInfoForAllUser failed"), std::string::npos);
 }
 }  // namespace OHOS

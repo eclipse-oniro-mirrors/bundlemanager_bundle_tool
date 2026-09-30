@@ -994,9 +994,10 @@ const std::string HELP_MSG_GET_COMPATIBLE_DEVICE_TYPE =
 const std::string HELP_MSG_GET_ADDITIONAL_INFO_FOR_ALL_USER =
     "usage: bundle_test_tool getAdditionalInfoForAllUser <option>\n"
     "eg: bundle_test_tool getAdditionalInfoForAllUser -n <bundle-name>\n"
+    "note: the queried bundle is installed for all users, the root identity is required\n"
     "options list:\n"
     "  -h, --help                             list available commands\n"
-    "  -n, --bundle-name <bundle-name>        specify bundle name of the application\n";
+    "  -n, --bundle-name <bundle-name>        specify bundle name of the application, required\n";
 
 const std::string HELP_MSG_BATCH_GET_COMPATIBLE_DEVICE_TYPE =
     "usage: bundle_test_tool batchGetCompatibleDeviceType <option>\n"
@@ -1010,7 +1011,7 @@ const std::string HELP_MSG_BATCH_GET_ADDITIONAL_INFO =
     "eg: bundle_test_tool batchGetAdditionalInfo -n <bundle-name>,<bundle-name>\n"
     "options list:\n"
     "  -h, --help                             list available commands\n"
-    "  -n, --bundle-name <bundle-name>        specify bundle name of the application\n";
+    "  -n, --bundle-name <bundle-name>        specify bundle name of the application, required\n";
 
 const std::string HELP_MSG_NO_QUERY_ABILITY_INFO_BY_CONTINUE_TYPE =
     "error: you must specify a bundle name with '-n' or '--bundle-name' \n"
@@ -8949,6 +8950,10 @@ ErrCode BundleTestTool::RunAsBatchGetAdditionalInfo()
         resultReceiver_.append(HELP_MSG_BATCH_GET_ADDITIONAL_INFO);
         return result;
     }
+    if (bundleMgrProxy_ == nullptr) {
+        APP_LOGE("Bundle mgr proxy is nullptr");
+        return OHOS::ERR_INVALID_VALUE;
+    }
     std::vector<BundleAdditionalInfo> additionalInfos;
     result = bundleMgrProxy_->BatchGetAdditionalInfo(bundleNames, additionalInfos);
     if (result != ERR_OK) {
@@ -9008,17 +9013,21 @@ ErrCode BundleTestTool::RunAsGetAdditionalInfoForAllUser()
     }
     if (result != OHOS::ERR_OK) {
         resultReceiver_.append(HELP_MSG_GET_ADDITIONAL_INFO_FOR_ALL_USER);
+        return result;
+    }
+    if (bundleMgrProxy_ == nullptr) {
+        APP_LOGE("Bundle mgr proxy is nullptr");
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    std::string additionalInfo;
+    result = bundleMgrProxy_->GetAdditionalInfoForAllUser(bundleName, additionalInfo);
+    if (result == ERR_OK) {
+        resultReceiver_.append(STRING_GET_ADDITIONAL_INFO_FOR_ALL_USER_OK);
+        resultReceiver_.append("additionalInfo: ");
+        resultReceiver_.append(additionalInfo + "\n");
     } else {
-        std::string additionalInfo;
-        result = bundleMgrProxy_->GetAdditionalInfoForAllUser(bundleName, additionalInfo);
-        if (result == ERR_OK) {
-            resultReceiver_.append(STRING_GET_ADDITIONAL_INFO_FOR_ALL_USER_OK);
-            resultReceiver_.append("additionalInfo: ");
-            resultReceiver_.append(additionalInfo + "\n");
-        } else {
-            resultReceiver_.append(STRING_GET_ADDITIONAL_INFO_FOR_ALL_USER_NG +
-                                   "errCode is " + std::to_string(result) + "\n");
-        }
+        resultReceiver_.append(STRING_GET_ADDITIONAL_INFO_FOR_ALL_USER_NG +
+                               "errCode is " + std::to_string(result) + "\n");
     }
     return result;
 }
