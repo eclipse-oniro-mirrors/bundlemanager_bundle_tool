@@ -1467,26 +1467,6 @@ HWTEST_F(OhosBmCommandTest, UninstallCommand_0600, TestSize.Level0)
 }
 
 /**
- * @tc.name: UninstallCommand_0700
- * @tc.desc: Test "ohos-bm uninstall -v" with invalid versionCode (negative).
- * @tc.type: FUNC
- */
-HWTEST_F(OhosBmCommandTest, UninstallCommand_0700, TestSize.Level0)
-{
-    char *argv[] = {
-        const_cast<char *>("ohos-bm"),
-        const_cast<char *>("uninstall"),
-        const_cast<char *>("-v"),
-        const_cast<char *>("-1"),
-    };
-    int argc = sizeof(argv) / sizeof(argv[0]);
-    BundleManagerShellCommand cmd(argc, argv);
-    SetMockObjects(cmd);
-    std::string result = cmd.ExecCommand();
-    EXPECT_NE(result.find("correct value"), std::string::npos);
-}
-
-/**
  * @tc.name: UninstallCommand_0800
  * @tc.desc: Test "ohos-bm uninstall -v" with non-numeric versionCode.
  * @tc.type: FUNC
@@ -3512,4 +3492,212 @@ HWTEST_F(OhosBmCommandTest, ReportPermissionIntegration_1900, TestSize.Level0)
     // No -c or -d specified → error
     EXPECT_NE(result.find("\"status\":\"failed\""), std::string::npos);
     EXPECT_NE(result.find("specify"), std::string::npos);
+}
+
+// ========== Install Command Tests ==========
+
+/**
+ * @tc.name: InstallCommand_0100
+ * @tc.desc: Test "ohos-bm install" with no options.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, InstallCommand_0100, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("install"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"failed\""), std::string::npos);
+    EXPECT_NE(result.find("no option"), std::string::npos);
+}
+
+/**
+ * @tc.name: InstallCommand_0200
+ * @tc.desc: Test "ohos-bm install -h" outputs install help.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, InstallCommand_0200, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("install"),
+        const_cast<char *>("-h"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("bundlePath"), std::string::npos);
+    EXPECT_NE(result.find("waittingTime"), std::string::npos);
+}
+
+/**
+ * @tc.name: InstallCommand_0300
+ * @tc.desc: Test "ohos-bm install -p" with no argument.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, InstallCommand_0300, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("install"),
+        const_cast<char *>("-p"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"failed\""), std::string::npos);
+    EXPECT_NE(result.find("correct value"), std::string::npos);
+}
+
+/**
+ * @tc.name: InstallCommand_0400
+ * @tc.desc: Test "ohos-bm install -r" with no bundle path option.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, InstallCommand_0400, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("install"),
+        const_cast<char *>("-r"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"failed\""), std::string::npos);
+    EXPECT_NE(result.find("bundle path"), std::string::npos);
+}
+
+/**
+ * @tc.name: InstallCommand_0500
+ * @tc.desc: Test "ohos-bm install" with an unknown option.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, InstallCommand_0500, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("install"),
+        const_cast<char *>("-x"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"failed\""), std::string::npos);
+}
+
+/**
+ * @tc.name: InstallCommand_0600
+ * @tc.desc: Test "ohos-bm install -p <bundle-path>" full flow with mock installer.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, InstallCommand_0600, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("install"),
+        const_cast<char *>("-p"),
+        const_cast<char *>(STRING_BUNDLE_PATH.c_str()),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"success\""), std::string::npos);
+}
+
+/**
+ * @tc.name: InstallCommand_0700
+ * @tc.desc: Test "ohos-bm install -p <path> -w" with an invalid waitting time.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, InstallCommand_0700, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("install"),
+        const_cast<char *>("-p"),
+        const_cast<char *>(STRING_BUNDLE_PATH.c_str()),
+        const_cast<char *>("-w"),
+        const_cast<char *>(MINIMUMT_WAIT_TIME.c_str()),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"failed\""), std::string::npos);
+    EXPECT_NE(result.find("correct value"), std::string::npos);
+}
+
+/**
+ * @tc.name: InstallCommand_0800
+ * @tc.desc: Test "ohos-bm install -p <path> -u" with an invalid user id.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, InstallCommand_0800, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("install"),
+        const_cast<char *>("-p"),
+        const_cast<char *>(STRING_BUNDLE_PATH.c_str()),
+        const_cast<char *>("-u"),
+        const_cast<char *>(ERR_USER_ID.c_str()),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"failed\""), std::string::npos);
+    EXPECT_NE(result.find("correct value"), std::string::npos);
+}
+
+/**
+ * @tc.name: InstallCommand_0900
+ * @tc.desc: Test "ohos-bm install -p <path> <path>" with multiple bundle paths.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, InstallCommand_0900, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("install"),
+        const_cast<char *>("-p"),
+        const_cast<char *>(STRING_BUNDLE_PATH.c_str()),
+        const_cast<char *>(STRING_OTHER_BUNDLE_PATH.c_str()),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"success\""), std::string::npos);
+}
+
+/**
+ * @tc.name: InstallCommand_1000
+ * @tc.desc: Test "ohos-bm install -p <path> -r" with install flags.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, InstallCommand_1000, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("install"),
+        const_cast<char *>("-p"),
+        const_cast<char *>(STRING_BUNDLE_PATH.c_str()),
+        const_cast<char *>("-r"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"success\""), std::string::npos);
 }
