@@ -153,6 +153,8 @@ private:
     ErrCode RunAsIsBundleInstalled();
     ErrCode RunAsGetCompatibleDeviceType();
     ErrCode RunAsBatchGetCompatibleDeviceType();
+    ErrCode RunAsBatchGetAdditionalInfo();
+    ErrCode RunAsGetAdditionalInfoForAllUser();
     ErrCode RunAsGetSimpleAppInfoForUid();
     ErrCode RunAsGetBundleNameByAppId();
     ErrCode RunAsGetAssetAccessGroups();

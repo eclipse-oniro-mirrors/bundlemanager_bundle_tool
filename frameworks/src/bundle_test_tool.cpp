@@ -263,7 +263,9 @@ static const std::string HELP_MSG =
     "  isBundleInstalled                determine whether the bundle is installed based on bundleName user "
     "and appIndex\n"
     "  getCompatibleDeviceType          obtain the compatible device type based on bundleName\n"
+    "  getAdditionalInfoForAllUser      obtain the additional info of the bundle on all users\n"
     "  batchGetCompatibleDeviceType     batch obtain the compatible device types based on bundleNames\n"
+    "  batchGetAdditionalInfo           batch obtain the additional infos based on bundleNames\n"
     "  getSimpleAppInfoForUid           get bundlename list and appIndex list by uid list\n"
     "  getBundleNameByAppId             get bundlename by appid or appIdentifier\n"
     "  getAssetAccessGroups             get asset access groups by bundlename\n"
@@ -1022,12 +1024,27 @@ const std::string HELP_MSG_GET_COMPATIBLE_DEVICE_TYPE =
     "  -h, --help                             list available commands\n"
     "  -n, --bundle-name <bundle-name>        specify bundle name of the application\n";
 
+const std::string HELP_MSG_GET_ADDITIONAL_INFO_FOR_ALL_USER =
+    "usage: bundle_test_tool getAdditionalInfoForAllUser <option>\n"
+    "eg: bundle_test_tool getAdditionalInfoForAllUser -n <bundle-name>\n"
+    "note: the queried bundle is installed for all users, the root identity is required\n"
+    "options list:\n"
+    "  -h, --help                             list available commands\n"
+    "  -n, --bundle-name <bundle-name>        specify bundle name of the application, required\n";
+
 const std::string HELP_MSG_BATCH_GET_COMPATIBLE_DEVICE_TYPE =
     "usage: bundle_test_tool batchGetCompatibleDeviceType <option>\n"
     "eg: bundle_test_tool batchGetCompatibleDeviceType -n <bundle-name>,<bundle-name>\n"
     "options list:\n"
     "  -h, --help                             list available commands\n"
     "  -n, --bundle-name <bundle-name>        specify bundle name of the application\n";
+
+const std::string HELP_MSG_BATCH_GET_ADDITIONAL_INFO =
+    "usage: bundle_test_tool batchGetAdditionalInfo <option>\n"
+    "eg: bundle_test_tool batchGetAdditionalInfo -n <bundle-name>,<bundle-name>\n"
+    "options list:\n"
+    "  -h, --help                             list available commands\n"
+    "  -n, --bundle-name <bundle-name>        specify bundle name of the application, required\n";
 
 const std::string HELP_MSG_NO_QUERY_ABILITY_INFO_BY_CONTINUE_TYPE =
     "error: you must specify a bundle name with '-n' or '--bundle-name' \n"
@@ -1265,7 +1282,12 @@ const std::string STRING_GET_UNINSTALLED_BUNDLE_INFO_NG = "getUninstalledBundleI
 const std::string STRING_GET_COMPATIBLE_DEVICE_TYPE_OK = "getCompatibleDeviceType successfully\n";
 const std::string STRING_GET_COMPATIBLE_DEVICE_TYPE_NG = "getCompatibleDeviceType failed\n";
 
+const std::string STRING_GET_ADDITIONAL_INFO_FOR_ALL_USER_OK = "getAdditionalInfoForAllUser successfully\n";
+const std::string STRING_GET_ADDITIONAL_INFO_FOR_ALL_USER_NG = "getAdditionalInfoForAllUser failed\n";
+
 const std::string STRING_BATCH_GET_COMPATIBLE_DEVICE_TYPE_NG = "batchGetCompatibleDeviceType failed\n";
+
+const std::string STRING_BATCH_GET_ADDITIONAL_INFO_NG = "batchGetAdditionalInfo failed\n";
 
 const std::string STRING_BATCH_GET_BUNDLE_INFO_OK = "batchGetBundleInfo successfully\n";
 const std::string STRING_BATCH_GET_BUNDLE_INFO_NG = "batchGetBundleInfo failed\n";
@@ -1826,6 +1848,13 @@ const struct option LONG_OPTIONS_GET_COMPATIBLE_DEVICE_TYPE[] = {
     {nullptr, 0, nullptr, 0},
 };
 
+const std::string SHORT_OPTIONS_GET_ADDITIONAL_INFO_FOR_ALL_USER = "hn:";
+const struct option LONG_OPTIONS_GET_ADDITIONAL_INFO_FOR_ALL_USER[] = {
+    {"help", no_argument, nullptr, 'h'},
+    {"bundle-name", required_argument, nullptr, 'n'},
+    {nullptr, 0, nullptr, 0},
+};
+
 const std::string SHORT_OPTIONS_GET_ALL_BUNDLE_DIRS = "hu:";
 const struct option LONG_OPTIONS_GET_ALL_BUNDLE_DIRS[] = {
     {"help", no_argument, nullptr, 'h'},
@@ -1900,6 +1929,13 @@ const struct option LONG_OPTIONS_CLEAN_ALL_BUNDLE_CACHE[] = {
 
 const std::string SHORT_OPTIONS_BATCH_GET_COMPATIBLE_DEVICE_TYPE = "hn:";
 const struct option LONG_OPTIONS_BATCH_GET_COMPATIBLE_DEVICE_TYPE[] = {
+    {"help", no_argument, nullptr, 'h'},
+    {"bundle-name", required_argument, nullptr, 'n'},
+    {nullptr, 0, nullptr, 0},
+};
+
+const std::string SHORT_OPTIONS_BATCH_GET_ADDITIONAL_INFO = "hn:";
+const struct option LONG_OPTIONS_BATCH_GET_ADDITIONAL_INFO[] = {
     {"help", no_argument, nullptr, 'h'},
     {"bundle-name", required_argument, nullptr, 'n'},
     {nullptr, 0, nullptr, 0},
@@ -2300,8 +2336,12 @@ ErrCode BundleTestTool::CreateCommandMap()
             std::bind(&BundleTestTool::RunAsIsBundleInstalled, this)},
         {"getCompatibleDeviceType",
             std::bind(&BundleTestTool::RunAsGetCompatibleDeviceType, this)},
+        {"getAdditionalInfoForAllUser",
+            std::bind(&BundleTestTool::RunAsGetAdditionalInfoForAllUser, this)},
         {"batchGetCompatibleDeviceType",
             std::bind(&BundleTestTool::RunAsBatchGetCompatibleDeviceType, this)},
+        {"batchGetAdditionalInfo",
+            std::bind(&BundleTestTool::RunAsBatchGetAdditionalInfo, this)},
         {"getSimpleAppInfoForUid",
             std::bind(&BundleTestTool::RunAsGetSimpleAppInfoForUid, this)},
         {"getBundleNameByAppId",
@@ -8986,6 +9026,101 @@ ErrCode BundleTestTool::RunAsBatchGetCompatibleDeviceType()
                                    "errCode is " + std::to_string(result) +
                                    "\n");
         }
+    }
+    return result;
+}
+
+ErrCode BundleTestTool::RunAsBatchGetAdditionalInfo()
+{
+    APP_LOGI("RunAsBatchGetAdditionalInfo start");
+    ReloadNativeTokenInfo();
+    std::vector<std::string> bundleNames;
+    int32_t result = BatchBundleNameCommonFunc(
+        SHORT_OPTIONS_BATCH_GET_ADDITIONAL_INFO,
+        LONG_OPTIONS_BATCH_GET_ADDITIONAL_INFO,
+        bundleNames);
+    if (result != OHOS::ERR_OK) {
+        resultReceiver_.append(HELP_MSG_BATCH_GET_ADDITIONAL_INFO);
+        return result;
+    }
+    if (bundleMgrProxy_ == nullptr) {
+        APP_LOGE("Bundle mgr proxy is nullptr");
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    std::vector<BundleAdditionalInfo> additionalInfos;
+    result = bundleMgrProxy_->BatchGetAdditionalInfo(bundleNames, additionalInfos);
+    if (result != ERR_OK) {
+        resultReceiver_.append(STRING_BATCH_GET_ADDITIONAL_INFO_NG +
+                               "errCode is " + std::to_string(result) + "\n");
+        return result;
+    }
+    nlohmann::json jsonResult = nlohmann::json::array();
+    for (const auto &additionalInfo : additionalInfos) {
+        nlohmann::json rowData;
+        rowData["bundleName"] = additionalInfo.bundleName;
+        if (additionalInfo.errCode == ERR_OK) {
+            rowData["additionalInfo"] = additionalInfo.additionalInfo;
+        } else {
+            rowData["errCode"] = additionalInfo.errCode;
+        }
+        jsonResult.push_back(rowData);
+    }
+    resultReceiver_.append(jsonResult.dump() + "\n");
+    return ERR_OK;
+}
+
+ErrCode BundleTestTool::RunAsGetAdditionalInfoForAllUser()
+{
+    APP_LOGI("RunAsGetAdditionalInfoForAllUser start");
+    std::string commandName = "getAdditionalInfoForAllUser";
+    int32_t result = OHOS::ERR_OK;
+    int32_t counter = 0;
+    std::string name = "";
+    std::string bundleName = "";
+    int32_t option = 0;
+    while ((option = getopt_long(argc_, argv_, SHORT_OPTIONS_GET_ADDITIONAL_INFO_FOR_ALL_USER.c_str(),
+        LONG_OPTIONS_GET_ADDITIONAL_INFO_FOR_ALL_USER, nullptr)) != -1) {
+        counter++;
+        APP_LOGD("option: %{public}d, optopt: %{public}d, optind: %{public}d", option, optopt, optind);
+        if (optind < 0 || optind > argc_) {
+            return OHOS::ERR_INVALID_VALUE;
+        }
+        int temp = 0;
+        result = !CheckGetStringCorrectOption(option, commandName, temp, name)
+            ? OHOS::ERR_INVALID_VALUE : result;
+        bundleName = option == 'n' ? name : bundleName;
+    }
+    if (counter == 0) {
+        if (optind < 0 || optind >= argc_ || argv_[optind] == nullptr) {
+            return OHOS::ERR_INVALID_VALUE;
+        }
+        if (strcmp(argv_[optind], cmd_.c_str()) == 0) {
+            APP_LOGD("bundle_test_tool getAdditionalInfoForAllUser with no option.");
+            resultReceiver_.append(HELP_MSG_GET_ADDITIONAL_INFO_FOR_ALL_USER);
+            return OHOS::ERR_INVALID_VALUE;
+        }
+    }
+    APP_LOGI("bundleName: %{public}s", bundleName.c_str());
+    if (result == OHOS::ERR_OK && (bundleName.empty())) {
+        result = OHOS::ERR_INVALID_VALUE;
+    }
+    if (result != OHOS::ERR_OK) {
+        resultReceiver_.append(HELP_MSG_GET_ADDITIONAL_INFO_FOR_ALL_USER);
+        return result;
+    }
+    if (bundleMgrProxy_ == nullptr) {
+        APP_LOGE("Bundle mgr proxy is nullptr");
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    std::string additionalInfo;
+    result = bundleMgrProxy_->GetAdditionalInfoForAllUser(bundleName, additionalInfo);
+    if (result == ERR_OK) {
+        resultReceiver_.append(STRING_GET_ADDITIONAL_INFO_FOR_ALL_USER_OK);
+        resultReceiver_.append("additionalInfo: ");
+        resultReceiver_.append(additionalInfo + "\n");
+    } else {
+        resultReceiver_.append(STRING_GET_ADDITIONAL_INFO_FOR_ALL_USER_NG +
+                               "errCode is " + std::to_string(result) + "\n");
     }
     return result;
 }
