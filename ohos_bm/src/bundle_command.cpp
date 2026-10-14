@@ -47,7 +47,7 @@ const int32_t INVALID_ARGS_NUMBER = 2;
 const int32_t MINIMUM_WAITTING_TIME = 180; // 3 mins
 const int32_t MAXIMUM_WAITTING_TIME = 600; // 10 mins
 
-const std::string INSTALL_OPTIONS = "hp:ru:w";
+const std::string INSTALL_OPTIONS = "hp:ru:w:";
 const struct option INSTALL_LONG_OPTIONS[] = {
     {"help", no_argument, nullptr, 'h'},
     {"bundlePath", required_argument, nullptr, 'p'},

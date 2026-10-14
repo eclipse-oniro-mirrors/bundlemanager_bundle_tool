@@ -2,7 +2,7 @@
 
 ## 1. 概述
 
-`ohos-bm` 是 OpenHarmony 系统的包管理器命令行工具，用于管理应用程序包。它提供了应用包的卸载、信息查看、依赖关系查询、共享库管理、缓存/数据清理以及克隆应用处置规则管理等功能。
+`ohos-bm` 是 OpenHarmony 系统的包管理器命令行工具，用于管理应用程序包。它提供了应用包的安装、卸载、信息查看、依赖关系查询、共享库管理、缓存/数据清理以及克隆应用处置规则管理等功能。
 
 ### 文件结构
 
@@ -36,6 +36,7 @@ ohos_bm/
 | 子命令 | 作用 | 可选参数 | 所需权限 |
 |-------|------|---------|---------|
 | `--help` | 查看ohos-bm帮助信息 | 无 | 无 |
+| `install` | 安装应用包 | `--bundlePath <bundle-path>`：安装的HAP/APP路径（必选，可多次指定实现多路径安装）<br>`--replace`：替换已有应用<br>`--userId <user-id>`：指定用户（仅支持当前用户或0）<br>`--waittingTime <waitting-time>`：安装等待时间（180-600秒，默认180） | `ohos.permission.ALLOW_INSTALL_DEBUG_HAP` |
 | `uninstall` | 卸载应用包 | `--bundleName <bundle-name>`：指定要卸载的包名<br>`--keepData`：卸载后保留用户数据<br>`--shared`：卸载应用间共享库<br>`--version <version-code>`：指定共享库版本号卸载 | `ohos.permission.cli.UNINSTALL_BUNDLE` |
 | `dump` | 查看应用包信息 | `--all`：列出系统中所有应用包<br>`--bundleName <bundle-name>`：查看指定包的信息<br>`--shortcutInfo`：查看快捷方式信息<br>`--deviceId <device-id>`：指定设备ID查看分布式应用信息<br>`--debugBundle`：列出调试应用包<br>`--label`：查看标签信息 | `ohos.permission.GET_INSTALLED_BUNDLE_LIST` |
 | `public-dump` | 查看应用包信息（功能与`dump`一致，但不支持`--deviceId`，不支持查询分布式应用信息） | `--all`：列出系统中所有应用包<br>`--bundleName <bundle-name>`：查看指定包的信息<br>`--shortcutInfo`：查看快捷方式信息<br>`--debugBundle`：列出调试应用包<br>`--label`：查看标签信息 | `ohos.permission.GET_ALL_BUNDLE_INFO` |
@@ -113,7 +114,26 @@ ohos_bm/
 ohos-bm --help
 ```
 
-### 4.2 卸载应用包
+### 4.2 安装应用包
+
+```bash
+# 安装指定路径的应用
+ohos-bm install --bundlePath /data/test/bundle_test/testdemo.hap
+
+# 多路径安装
+ohos-bm install --bundlePath /data/test/bundle_test/testdemo.hap /data/test/bundle_test/otherdemo.hap
+
+# 替换安装已有应用
+ohos-bm install --bundlePath /data/test/bundle_test/testdemo.hap --replace
+
+# 指定安装等待时间（180-600秒，默认180）
+ohos-bm install --bundlePath /data/test/bundle_test/testdemo.hap --waittingTime 200
+
+# 为0用户安装
+ohos-bm install --bundlePath /data/test/bundle_test/testdemo.hap --userId 0
+```
+
+### 4.3 卸载应用包
 
 ```bash
 # 卸载指定包名的应用
@@ -129,7 +149,7 @@ ohos-bm uninstall --bundleName com.example.sharedlib --shared
 ohos-bm uninstall --bundleName com.example.sharedlib --shared --version 1000000
 ```
 
-### 4.3 查看应用包信息
+### 4.4 查看应用包信息
 
 ```bash
 # 列出系统中所有应用包
@@ -173,14 +193,14 @@ ohos-bm public-dump --debugBundle
 ohos-bm public-dump --all --label
 ```
 
-### 4.4 查看依赖关系
+### 4.5 查看依赖关系
 
 ```bash
 # 查看指定应用和模块的依赖关系
 ohos-bm dump-dependencies --bundleName com.example.test --moduleName entry
 ```
 
-### 4.5 查看共享库信息
+### 4.6 查看共享库信息
 
 ```bash
 # 列出所有应用间共享库
@@ -190,7 +210,7 @@ ohos-bm dump-shared --all
 ohos-bm dump-shared --bundleName com.example.sharedlib
 ```
 
-### 4.6 清理应用缓存或数据
+### 4.7 清理应用缓存或数据
 
 ```bash
 # 清理应用缓存文件
@@ -203,7 +223,7 @@ ohos-bm clean --bundleName com.example.test --data
 ohos-bm clean --bundleName com.example.test --cache --appIndex 1001
 ```
 
-### 4.7 设置处置规则
+### 4.8 设置处置规则
 
 ```bash
 # 阻止整个应用并重定向
@@ -254,7 +274,7 @@ ohos-bm set-disposed-rule \
     --wantAbilityName MainAbility
 ```
 
-### 4.8 删除处置规则
+### 4.9 删除处置规则
 
 ```bash
 # 根据appId删除处置规则
