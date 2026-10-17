@@ -25,6 +25,10 @@ const std::string SECOND_BUNDLE_NAME = "com.example.bundle.two";
 constexpr int32_t CACHE_STATS_INDEX = 4;
 constexpr int64_t CACHE_SIZE_ONE = 100;
 constexpr int64_t CACHE_SIZE_TWO = 200;
+const std::string MOCK_LABEL_LIST =
+    "[{\"bundleName\":\"com.example.music\",\"label\":\"Music\"},"
+    "{\"bundleName\":\"com.example.player\",\"label\":\"Media Player\"},"
+    "{\"bundleName\":\"com.example.camera\",\"label\":\"Camera\"}]";
 
 bool g_getBundleInfosResult = true;
 bool g_getBundleStatsFailSecondBundle = false;
@@ -46,6 +50,10 @@ bool MockBundleMgrHost::DumpInfos(
     APP_LOGD("enter");
     APP_LOGD("flag: %{public}d", flag);
     APP_LOGD("bundleName: %{public}s", bundleName.c_str());
+    if (flag == DumpFlag::DUMP_LABEL_LIST) {
+        result = MOCK_LABEL_LIST;
+        return true;
+    }
     if (bundleName.size() > 0) {
         result = bundleName + "\n";
     } else {

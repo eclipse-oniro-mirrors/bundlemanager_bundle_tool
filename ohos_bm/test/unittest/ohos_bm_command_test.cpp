@@ -1711,6 +1711,208 @@ HWTEST_F(OhosBmCommandTest, DumpCommand_1400, TestSize.Level0)
     EXPECT_NE(result.find("\"status\":\"success\""), std::string::npos);
 }
 
+// ========== Dump Keyword Filter Tests ==========
+
+/**
+ * @tc.name: DumpKeyword_0100
+ * @tc.desc: AC-1 exact match, "ohos-bm dump -a -k Music" only outputs the matched app.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, DumpKeyword_0100, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("dump"),
+        const_cast<char *>("-a"),
+        const_cast<char *>("-k"),
+        const_cast<char *>("Music"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"success\""), std::string::npos);
+    EXPECT_NE(result.find("com.example.music"), std::string::npos);
+    EXPECT_EQ(result.find("com.example.player"), std::string::npos);
+}
+
+/**
+ * @tc.name: DumpKeyword_0200
+ * @tc.desc: AC-2 keyword fallback, "ohos-bm dump -a -k Media" outputs apps containing keyword.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, DumpKeyword_0200, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("dump"),
+        const_cast<char *>("-a"),
+        const_cast<char *>("-k"),
+        const_cast<char *>("Media"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"success\""), std::string::npos);
+    EXPECT_NE(result.find("com.example.player"), std::string::npos);
+}
+
+/**
+ * @tc.name: DumpKeyword_0300
+ * @tc.desc: AC-3 backward compatibility, "ohos-bm dump -a" outputs full list.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, DumpKeyword_0300, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("dump"),
+        const_cast<char *>("-a"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"success\""), std::string::npos);
+}
+
+/**
+ * @tc.name: DumpKeyword_0400
+ * @tc.desc: AC-4 no match, "ohos-bm dump -a -k NotExist" returns failure with explicit message.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, DumpKeyword_0400, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("dump"),
+        const_cast<char *>("-a"),
+        const_cast<char *>("-k"),
+        const_cast<char *>("NotExist"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"failed\""), std::string::npos);
+    EXPECT_NE(result.find("no bundle matched the keyword"), std::string::npos);
+}
+
+/**
+ * @tc.name: DumpKeyword_0500
+ * @tc.desc: AC-5 combine -a with -k, outputs filtered list instead of full list.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, DumpKeyword_0500, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("dump"),
+        const_cast<char *>("-a"),
+        const_cast<char *>("-k"),
+        const_cast<char *>("Music"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("com.example.music"), std::string::npos);
+    EXPECT_EQ(result.find("com.example.camera"), std::string::npos);
+}
+
+/**
+ * @tc.name: DumpKeyword_0600
+ * @tc.desc: AC-6 missing value for -k reports a correct value prompt.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, DumpKeyword_0600, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("dump"),
+        const_cast<char *>("-a"),
+        const_cast<char *>("-k"),
+        nullptr,
+    };
+    int argc = 4;
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("correct value"), std::string::npos);
+}
+
+/**
+ * @tc.name: DumpKeyword_0700
+ * @tc.desc: AC-7 duplicate -k, "ohos-bm dump -a -k Music -k Media" uses the last keyword.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, DumpKeyword_0700, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("dump"),
+        const_cast<char *>("-a"),
+        const_cast<char *>("-k"),
+        const_cast<char *>("Music"),
+        const_cast<char *>("-k"),
+        const_cast<char *>("Media"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"success\""), std::string::npos);
+    EXPECT_NE(result.find("com.example.player"), std::string::npos);
+    EXPECT_EQ(result.find("com.example.music"), std::string::npos);
+}
+
+/**
+ * @tc.name: DumpKeyword_0800
+ * @tc.desc: AC-8 -l combined with -k, "ohos-bm dump -a -l -k Music" takes -k filtering over -l.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, DumpKeyword_0800, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("dump"),
+        const_cast<char *>("-a"),
+        const_cast<char *>("-l"),
+        const_cast<char *>("-k"),
+        const_cast<char *>("Music"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"success\""), std::string::npos);
+    EXPECT_NE(result.find("com.example.music"), std::string::npos);
+    EXPECT_EQ(result.find("com.example.player"), std::string::npos);
+    EXPECT_EQ(result.find("com.example.camera"), std::string::npos);
+}
+
+/**
+ * @tc.name: DumpKeyword_0900
+ * @tc.desc: -k without -a reports that -k must be used with -a.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, DumpKeyword_0900, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("dump"),
+        const_cast<char *>("-k"),
+        const_cast<char *>("Music"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    std::string result = cmd.ExecCommand();
+    EXPECT_NE(result.find("\"status\":\"failed\""), std::string::npos);
+    EXPECT_NE(result.find("must be used with"), std::string::npos);
+}
+
 // ========== DumpShared Extended Tests ==========
 
 /**

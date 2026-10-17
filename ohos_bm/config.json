@@ -136,6 +136,11 @@
                     "label": {
                         "type": "boolean",
                         "default": false
+                    },
+                    "keyword": {
+                        "type": "string",
+                        "description": "Specify keyword to filter bundles by app label",
+                        "default": ""
                     }
                 }
             },

@@ -61,7 +61,10 @@ const std::string HELP_MSG_DUMP =
     "  --bundleName <bundle-name>      list the bundle info by a bundle name\n"
     "  --shortcutInfo                  list the shortcut info\n"
     "  --deviceId <device-id>          specify a device id\n"
-    "  --label                          list the label info\n";
+    "  --label                          list the label info\n"
+    "  --keyword <keyword>              filter bundles by app label keyword, exact match first,\n"
+    "                                    fallback to keyword containment match\n"
+    "                                    (must be used with --all)\n";
 
 const std::string HELP_MSG_PUBLIC_DUMP =
     "usage: ohos-bm public-dump <options>\n"
@@ -119,6 +122,11 @@ const std::string STRING_REQUIRE_CORRECT_VALUE = "error: option requires a corre
 
 const std::string HELP_MSG_DUMP_FAILED = "error: failed to get information and the parameters may be wrong.";
 
+const std::string HELP_MSG_DUMP_NO_MATCH = "error: no bundle matched the keyword: ";
+
+const std::string HELP_MSG_DUMP_KEYWORD_NEED_ALL =
+    "error: the -k/--keyword option must be used with -a/--all.";
+
 const std::string HELP_MSG_NO_REMOVABLE_OPTION =
     "error: you must specify a bundle name with --bundleName \n"
     "and a module name with --moduleName \n";
@@ -126,6 +134,7 @@ const std::string HELP_MSG_NO_REMOVABLE_OPTION =
 const std::string BUNDLE_NAME_EMPTY = "";
 const std::string SHARED_BUNDLE_INFO = "sharedBundleInfo";
 const std::string DEPENDENCIES = "dependencies";
+const std::string BUNDLE_LABEL = "label";
 
 const int32_t MAX_WAITING_TIME = 3000;
 const int32_t INITIAL_SANDBOX_APP_INDEX = 3000;
@@ -270,6 +279,7 @@ private:
     std::string DumpDistributedBundleInfo(const std::string &deviceId, const std::string &bundleName);
     std::string DumpAllLabel(int32_t userId) const;
     std::string DumpBundleLabel(const std::string &bundleName, int32_t userId) const;
+    std::string DumpBundleListByKeyword(const std::string &keyword, int32_t userId) const;
     
     ErrCode ParseParamInteger(std::map<std::string, int>& pi);
     ErrCode ParseParamBool(std::map<std::string, bool>& pb);
