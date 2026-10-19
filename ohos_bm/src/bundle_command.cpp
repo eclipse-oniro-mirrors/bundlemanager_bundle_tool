@@ -67,7 +67,7 @@ const struct option UNINSTALL_LONG_OPTIONS[] = {
     {nullptr, 0, nullptr, 0},
 };
 
-const std::string SHORT_OPTIONS_DUMP = "hn:aisd:gl";
+const std::string SHORT_OPTIONS_DUMP = "hn:aisd:glk:";
 const struct option LONG_OPTIONS_DUMP[] = {
     {"help", no_argument, nullptr, 'h'},
     {"bundleName", required_argument, nullptr, 'n'},
@@ -77,6 +77,7 @@ const struct option LONG_OPTIONS_DUMP[] = {
     {"deviceId", required_argument, nullptr, 'd'},
     {"debugBundle", no_argument, nullptr, 'g'},
     {"label", no_argument, nullptr, 'l'},
+    {"keyword", required_argument, nullptr, 'k'},
     {nullptr, 0, nullptr, 0},
 };
 
@@ -732,7 +733,9 @@ ErrCode BundleManagerShellCommand::RunAsDumpCommand()
     bool bundleDumpShortcut = false;
     bool bundleDumpDistributedBundleInfo = false;
     bool bundleDumpLabel = false;
+    bool bundleDumpKeyword = false;
     std::string deviceId = "";
+    std::string keyword = "";
     int32_t userId = BundleCommandCommon::GetOsAccountLocalIdFromUid(IPCSkeleton::GetCallingUid());
     while (true) {
         int32_t option = getopt_long(argc_, argv_, SHORT_OPTIONS_DUMP.c_str(), LONG_OPTIONS_DUMP, nullptr);
@@ -751,6 +754,13 @@ ErrCode BundleManagerShellCommand::RunAsDumpCommand()
                 }
                 case 'd': {
                     APP_LOGD("'ohos-bm dump -d' with no argument.");
+                    resultReceiver_ = CreateErrorResult(
+                        ERR_DUMP_PARAM_ERROR, STRING_REQUIRE_CORRECT_VALUE);
+                    result = OHOS::ERR_INVALID_VALUE;
+                    break;
+                }
+                case 'k': {
+                    APP_LOGD("'ohos-bm dump -k' with no argument.");
                     resultReceiver_ = CreateErrorResult(
                         ERR_DUMP_PARAM_ERROR, STRING_REQUIRE_CORRECT_VALUE);
                     result = OHOS::ERR_INVALID_VALUE;
@@ -806,6 +816,17 @@ ErrCode BundleManagerShellCommand::RunAsDumpCommand()
                 bundleDumpDistributedBundleInfo = true;
                 break;
             }
+            case 'k': {
+                APP_LOGD("'ohos-bm dump %{public}s %{public}s'", argv_[optind - INDEX_OFFSET], optarg);
+                if (optarg == nullptr || strlen(optarg) == 0) {
+                    resultReceiver_ = CreateErrorResult(ERR_DUMP_PARAM_ERROR, STRING_REQUIRE_CORRECT_VALUE);
+                    result = OHOS::ERR_INVALID_VALUE;
+                    break;
+                }
+                keyword = optarg;
+                bundleDumpKeyword = true;
+                break;
+            }
             default: {
                 result = OHOS::ERR_INVALID_VALUE;
                 break;
@@ -825,6 +846,12 @@ ErrCode BundleManagerShellCommand::RunAsDumpCommand()
                 ERR_DUMP_PARAM_ERROR, HELP_MSG_NO_BUNDLE_NAME_OPTION);
             result = OHOS::ERR_INVALID_VALUE;
         }
+        if ((resultReceiver_ == "") && bundleDumpKeyword && !bundleDumpAll) {
+            APP_LOGD("'ohos-bm dump -k' must be used with -a.");
+            resultReceiver_ = CreateErrorResult(
+                ERR_DUMP_PARAM_ERROR, HELP_MSG_DUMP_KEYWORD_NEED_ALL);
+            result = OHOS::ERR_INVALID_VALUE;
+        }
     }
     if (result != OHOS::ERR_OK) {
         if (resultReceiver_ == "") {
@@ -836,6 +863,8 @@ ErrCode BundleManagerShellCommand::RunAsDumpCommand()
             dumpResults = DumpShortcutInfos(bundleName, userId);
         } else if (bundleDumpDistributedBundleInfo) {
             dumpResults = DumpDistributedBundleInfo(deviceId, bundleName);
+        } else if (bundleDumpAll && bundleDumpKeyword) {
+            dumpResults = DumpBundleListByKeyword(keyword, userId);
         } else if (bundleDumpAll && !bundleDumpLabel) {
             dumpResults = DumpBundleList(userId);
         } else if (bundleDumpDebug) {
@@ -848,8 +877,13 @@ ErrCode BundleManagerShellCommand::RunAsDumpCommand()
             dumpResults = DumpBundleLabel(bundleName, userId);
         }
         if (dumpResults.empty()) {
-            resultReceiver_ = CreateErrorResult(
-                ERR_APPEXECFWK_SERVICE_INTERNAL_ERROR, HELP_MSG_DUMP_FAILED);
+            if (bundleDumpAll && bundleDumpKeyword) {
+                resultReceiver_ = CreateErrorResult(
+                    ERR_APPEXECFWK_SERVICE_INTERNAL_ERROR, HELP_MSG_DUMP_NO_MATCH + keyword + ".");
+            } else {
+                resultReceiver_ = CreateErrorResult(
+                    ERR_APPEXECFWK_SERVICE_INTERNAL_ERROR, HELP_MSG_DUMP_FAILED);
+            }
             return OHOS::ERR_INVALID_VALUE;
         } else {
             resultReceiver_ = CreateSuccessResult(dumpResults);
@@ -1429,6 +1463,59 @@ std::string BundleManagerShellCommand::DumpAllLabel(int32_t userId) const
         APP_LOGE("failed to dump bundle label list.");
     }
     return dumpResults;
+}
+
+std::string BundleManagerShellCommand::DumpBundleListByKeyword(
+    const std::string &keyword, int32_t userId) const
+{
+    std::string dumpResults = DumpAllLabel(userId);
+    if (dumpResults.empty()) {
+        APP_LOGE("failed to dump bundle label list.");
+        return "";
+    }
+    cJSON *labelArray = cJSON_Parse(dumpResults.c_str());
+    if (labelArray == nullptr || !cJSON_IsArray(labelArray)) {
+        APP_LOGE("failed to parse bundle label list.");
+        cJSON_Delete(labelArray);
+        return "";
+    }
+    cJSON *matchedArray = cJSON_CreateArray();
+    if (matchedArray == nullptr) {
+        APP_LOGE("failed to create matched array.");
+        cJSON_Delete(labelArray);
+        return "";
+    }
+    cJSON *item = nullptr;
+    cJSON_ArrayForEach(item, labelArray) {
+        cJSON *label = cJSON_GetObjectItem(item, BUNDLE_LABEL.c_str());
+        if (label != nullptr && cJSON_IsString(label) && label->valuestring != nullptr &&
+            keyword == std::string(label->valuestring)) {
+            cJSON_AddItemToArray(matchedArray, cJSON_Duplicate(item, true));
+        }
+    }
+    if (cJSON_GetArraySize(matchedArray) == 0) {
+        cJSON_ArrayForEach(item, labelArray) {
+            cJSON *label = cJSON_GetObjectItem(item, BUNDLE_LABEL.c_str());
+            if (label != nullptr && cJSON_IsString(label) && label->valuestring != nullptr &&
+                std::string(label->valuestring).find(keyword) != std::string::npos) {
+                cJSON_AddItemToArray(matchedArray, cJSON_Duplicate(item, true));
+            }
+        }
+    }
+    if (cJSON_GetArraySize(matchedArray) == 0) {
+        cJSON_Delete(matchedArray);
+        cJSON_Delete(labelArray);
+        return "";
+    }
+    char *output = cJSON_PrintUnformatted(matchedArray);
+    std::string ret;
+    if (output != nullptr) {
+        ret = std::string(output);
+        cJSON_free(output);
+    }
+    cJSON_Delete(matchedArray);
+    cJSON_Delete(labelArray);
+    return ret;
 }
 
 std::string BundleManagerShellCommand::DumpDebugBundleList(int32_t userId) const
