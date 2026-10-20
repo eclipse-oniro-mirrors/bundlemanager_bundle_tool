@@ -1,0 +1,254 @@
+{
+    "commands": {
+        "getBundleGids": {
+            "ipcCode": 10,
+            "options": [
+                {
+                    "short": "n",
+                    "long": "bundle-name",
+                    "type": "string",
+                    "param": "bundleName",
+                    "required": true
+                }
+            ],
+            "params": [
+                {
+                    "name": "bundleName",
+                    "type": "string",
+                    "source": "option"
+                }
+            ],
+            "reply": [
+                {
+                    "type": "bool",
+                    "name": "success"
+                },
+                {
+                    "type": "int32vector",
+                    "name": "gids",
+                    "condition": "success"
+                }
+            ]
+        },
+        "getContinueBundleNames": {
+            "ipcCode": 162,
+            "options": [
+                {
+                    "short": "n",
+                    "long": "bundle-name",
+                    "type": "string",
+                    "param": "continueBundleName",
+                    "required": true
+                },
+                {
+                    "short": "u",
+                    "long": "user-id",
+                    "type": "int32",
+                    "param": "userId",
+                    "required": false
+                }
+            ],
+            "params": [
+                {
+                    "name": "continueBundleName",
+                    "type": "string",
+                    "source": "option"
+                },
+                {
+                    "name": "userId",
+                    "type": "int32",
+                    "source": "option"
+                }
+            ],
+            "reply": [
+                {
+                    "type": "int32",
+                    "name": "ret"
+                },
+                {
+                    "type": "stringvector",
+                    "name": "bundleNames",
+                    "condition": "ret"
+                }
+            ]
+        },
+        "checkAbilityEnableInstall": {
+            "ipcCode": 76,
+            "options": [
+                {
+                    "short": "n",
+                    "long": "bundle-name",
+                    "type": "string",
+                    "param": "bundleName",
+                    "required": false
+                },
+                {
+                    "short": "a",
+                    "long": "ability-name",
+                    "type": "string",
+                    "param": "abilityName",
+                    "required": false
+                },
+                {
+                    "short": "m",
+                    "long": "module-name",
+                    "type": "string",
+                    "param": "moduleName",
+                    "required": false
+                },
+                {
+                    "short": "d",
+                    "long": "device-id",
+                    "type": "string",
+                    "param": "deviceId",
+                    "required": false
+                },
+                {
+                    "short": "i",
+                    "long": "mission-id",
+                    "type": "int32",
+                    "param": "missionId",
+                    "required": false
+                },
+                {
+                    "short": "u",
+                    "long": "user-id",
+                    "type": "int32",
+                    "param": "userId",
+                    "required": false
+                }
+            ],
+            "params": [
+                {
+                    "name": "want",
+                    "type": "want",
+                    "source": "option"
+                },
+                {
+                    "name": "missionId",
+                    "type": "int32",
+                    "source": "option"
+                },
+                {
+                    "name": "userId",
+                    "type": "int32",
+                    "source": "option"
+                },
+                {
+                    "name": "callback",
+                    "type": "remoteobject",
+                    "source": "option"
+                }
+            ],
+            "reply": [
+                {
+                    "type": "bool",
+                    "name": "success"
+                }
+            ]
+        },
+        "getBundleInfosForContinuation": {
+            "ipcCode": 161,
+            "options": [
+                {
+                    "short": "f",
+                    "long": "flags",
+                    "type": "int32",
+                    "param": "flags",
+                    "required": true
+                },
+                {
+                    "short": "u",
+                    "long": "user-id",
+                    "type": "int32",
+                    "param": "userId",
+                    "required": false
+                }
+            ],
+            "params": [
+                {
+                    "name": "flags",
+                    "type": "int32",
+                    "source": "option"
+                },
+                {
+                    "name": "userId",
+                    "type": "int32",
+                    "source": "option"
+                }
+            ],
+            "reply": [
+                {
+                    "type": "bool",
+                    "name": "success"
+                }
+            ]
+        },
+        "isDebuggableApplication": {
+            "ipcCode": 202,
+            "options": [
+                {
+                    "short": "n",
+                    "long": "bundle-name",
+                    "type": "string",
+                    "param": "bundleName",
+                    "required": true
+                }
+            ],
+            "params": [
+                {
+                    "name": "bundleName",
+                    "type": "string",
+                    "source": "option"
+                }
+            ],
+            "reply": [
+                {
+                    "type": "int32",
+                    "name": "ret"
+                },
+                {
+                    "type": "bool",
+                    "name": "isDebuggable"
+                }
+            ]
+        },
+        "getUidByDebugBundleName": {
+            "ipcCode": 111,
+            "options": [
+                {
+                    "short": "n",
+                    "long": "bundle-name",
+                    "type": "string",
+                    "param": "bundleName",
+                    "required": true
+                },
+                {
+                    "short": "u",
+                    "long": "user-id",
+                    "type": "int32",
+                    "param": "userId",
+                    "required": false
+                }
+            ],
+            "params": [
+                {
+                    "name": "bundleName",
+                    "type": "string",
+                    "source": "option"
+                },
+                {
+                    "name": "userId",
+                    "type": "int32",
+                    "source": "option"
+                }
+            ],
+            "reply": [
+                {
+                    "type": "int32",
+                    "name": "uid"
+                }
+            ]
+        }
+    }
+}

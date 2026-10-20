@@ -62,6 +62,7 @@
 #include "status_receiver_impl.h"
 #include "string_ex.h"
 #include "json_util.h"
+#include "bundle_test_ipc_caller.h"
 #ifdef DISTRIBUTED_BUNDLE_FRAMEWORK
 #include "distributed_bundle_mgr_client.h"
 #endif
@@ -280,7 +281,8 @@ static const std::string HELP_MSG =
     "  querySandboxCloneAbilityInfo     query sandbox clone ability info\n"
     "  filterBundleListByDeviceModeDistributionPolicies  filter bundle list by device mode "
     "distribution policies\n"
-    "  install                          install bundles with specified paths\n";
+    "  install                          install bundles with specified paths\n"
+    "  call                             call IPC command by config, eg: call list, call <cmd> -h\n";
 
 
 const std::string HELP_MSG_GET_REMOVABLE =
@@ -2248,7 +2250,8 @@ ErrCode BundleTestTool::CreateCommandMap()
             std::bind(&BundleTestTool::RunAsQuerySandboxCloneAbilityInfo, this)},
         {"filterBundleListByDeviceModeDistributionPolicies",
             std::bind(&BundleTestTool::RunAsFilterBundleListByDeviceModeDistributionPolicies, this)},
-        {"install", std::bind(&BundleTestTool::RunAsInstallCommand, this)}
+        {"install", std::bind(&BundleTestTool::RunAsInstallCommand, this)},
+        {"call", std::bind(&BundleTestTool::RunAsCallCommand, this)}
     };
 
     return OHOS::ERR_OK;
@@ -2264,6 +2267,12 @@ ErrCode BundleTestTool::CreateMessageMap()
 ErrCode BundleTestTool::Init()
 {
     APP_LOGI("BundleTestTool Init()");
+    if (cmd_ == "call") {
+        if (ipcCaller_ == nullptr) {
+            ipcCaller_ = std::make_unique<GenericIpcCaller>();
+        }
+        return OHOS::ERR_OK;
+    }
     ErrCode result = OHOS::ERR_OK;
     if (bundleMgrProxy_ == nullptr) {
         bundleMgrProxy_ = BundleCommandCommon::GetBundleMgrProxy();
@@ -2354,6 +2363,34 @@ ErrCode BundleTestTool::RunAsHelpCommand()
     resultReceiver_.append(HELP_MSG);
 
     return OHOS::ERR_OK;
+}
+
+ErrCode BundleTestTool::RunAsCallCommand()
+{
+    if (argList_.empty()) {
+        resultReceiver_.append("error: you must specify a subcommand, use 'call list' to see available commands.\n");
+        return OHOS::ERR_INVALID_VALUE;
+    }
+
+    std::string subCmd = argList_[0];
+    if (subCmd == "list") {
+        if (ipcCaller_ == nullptr) {
+            ipcCaller_ = std::make_unique<GenericIpcCaller>();
+        }
+        resultReceiver_.append(ipcCaller_->ListCommands());
+        return OHOS::ERR_OK;
+    }
+
+    if (ipcCaller_ == nullptr) {
+        ipcCaller_ = std::make_unique<GenericIpcCaller>();
+    }
+
+    int subArgc = argc_ - 2;
+    char **subArgv = argv_ + 2;
+    std::string output;
+    ErrCode ret = ipcCaller_->ExecuteCommand(subCmd, subArgc, subArgv, output);
+    resultReceiver_.append(output);
+    return ret;
 }
 
 ErrCode BundleTestTool::CheckOperation(int userId, std::string deviceId, std::string bundleName,
