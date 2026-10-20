@@ -172,6 +172,7 @@ private:
     // eg: bundle_test_tool batchGetBundleInfo -n <bundle-name>,<bundle-name> -f <flags> -u <user-id>
     ErrCode RunAsBatchGetBundleInfo();
     ErrCode RunAsParseSpmModule();
+    ErrCode RunAsGetSandboxDataDirName();
     ErrCode RunAsQueryAbilityInfo();
     ErrCode ParseQueryAbilityInfoOptions(std::string &bundleName, std::string &moduleName,
         std::string &abilityName, int32_t &flags, int32_t &userId);
