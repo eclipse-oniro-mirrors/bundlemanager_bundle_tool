@@ -22,6 +22,7 @@
 #include "bundle_event_callback_host.h"
 #include "bundle_mgr_interface.h"
 #include "bundle_installer_interface.h"
+#include "bundle_test_ipc_caller.h"
 
 #ifndef BMS_FDSAN_BUNDLE_TEST_TOOL_TAG
 #define BMS_FDSAN_BUNDLE_TEST_TOOL_TAG (((uint64_t)LOG_DOMAIN << 32) | 0x1)
@@ -43,6 +44,9 @@ class BundleTestTool : public ShellCommand {
 public:
     BundleTestTool(int argc, char *argv[]);
     ~BundleTestTool();
+
+    void SetBundleMgrProxy(const sptr<IBundleMgr> &proxy) { bundleMgrProxy_ = proxy; }
+    void SetBundleInstallerProxy(const sptr<IBundleInstaller> &proxy) { bundleInstallerProxy_ = proxy; }
 
 private:
     ErrCode CreateCommandMap() override;
@@ -225,6 +229,7 @@ private:
     ErrCode ExecuteQuerySandboxCloneAbilityInfo(const std::string &creatorBundleName,
         const std::string &bundleName, const std::string &moduleName, const std::string &abilityName,
         int32_t flags, int32_t appIndex, int32_t userId);
+    ErrCode RunAsCallCommand();
 
     std::condition_variable cv_;
     std::mutex mutex_;
@@ -233,6 +238,7 @@ private:
     sptr<IBundleMgr> bundleMgrProxy_;
     sptr<IBundleInstaller> bundleInstallerProxy_;
     sptr<IBundleResource> bundleResourceProxy_;
+    std::unique_ptr<GenericIpcCaller> ipcCaller_;
 
     bool CheckRemovableErrorOption(int option, int counter, const std::string &commandName);
     bool CheckRemovableCorrectOption(int option, const std::string &commandName, int &isRemovable, std::string &name);
