@@ -10358,6 +10358,8 @@ ErrCode BundleTestTool::RunAsParseSpmModule()
             nlohmann::json jsonResult;
             jsonResult["bundleName"] = moduleInfo.bundleName;
             jsonResult["moduleName"] = moduleInfo.moduleName;
+            jsonResult["moduleType"] = moduleInfo.moduleType;
+            jsonResult["allowAutoControlIntent"] = moduleInfo.allowAutoControlIntent;
             jsonResult["bundleType"] = static_cast<int32_t>(moduleInfo.bundleType);
             jsonResult["apiTargetVersion"] = moduleInfo.apiTargetVersion;
             jsonResult["skillName"] = moduleInfo.skillName;
