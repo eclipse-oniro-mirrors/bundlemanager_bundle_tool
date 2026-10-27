@@ -281,6 +281,7 @@ static const std::string HELP_MSG =
     "  getApiTargetVersionByUid          get api target version by uid\n"
     "  getTopNLargestItemsInAppDataDir  get top N largest items in app data dir\n"
     "  parseSpmModule                   parse spm module\n"
+    "  getSandboxDataDirName            get the sandbox data directory name\n"
     "  getMainAndCloneBundleInfo        get main and clone bundle info\n"
     "  querySandboxCloneAbilityInfo     query sandbox clone ability info\n"
     "  filterBundleListByDeviceModeDistributionPolicies  filter bundle list by device mode "
@@ -572,6 +573,14 @@ const std::string HELP_MSG_PARSE_SPM_MODULE =
     "options list:\n"
     "  -h, --help                             list available commands\n"
     "  -p, --module-json-path <path>          specify module.json file path\n";
+
+const std::string HELP_MSG_GET_SANDBOX_DATA_DIR_NAME =
+    "usage: bundle_test_tool getSandboxDataDirName -n <bundle-name> -a <app-index>\n"
+    "options list:\n"
+    "  -h, --help                            show this help\n"
+    "  -n, --bundle-name <bundle-name>        specify the original bundle name\n"
+    "  -a, --app-index <app-index>            specify a signed 32-bit application index\n"
+    "Returns the bundle name for appIndex <= 0, or +clone-{appIndex}+{bundleName} for appIndex > 0.\n";
 
 const std::string HELP_MSG_QUERY_ABILITY_INFO =
     "usage: bundle_test_tool queryAbilityInfo <options>\n"
@@ -1952,6 +1961,14 @@ const struct option LONG_OPTIONS_BATCH_GET_BUNDLE_INFO[] = {
     {nullptr, 0, nullptr, 0},
 };
 
+const std::string SHORT_OPTIONS_GET_SANDBOX_DATA_DIR_NAME = "hn:a:";
+const struct option LONG_OPTIONS_GET_SANDBOX_DATA_DIR_NAME[] = {
+    {"help", no_argument, nullptr, 'h'},
+    {"bundle-name", required_argument, nullptr, 'n'},
+    {"app-index", required_argument, nullptr, 'a'},
+    {nullptr, 0, nullptr, 0},
+};
+
 const std::string SHORT_OPTIONS_PARSE_SPM_MODULE = "hp:";
 const struct option LONG_OPTIONS_PARSE_SPM_MODULE[] = {
     {"help", no_argument, nullptr, 'h'},
@@ -2367,6 +2384,7 @@ ErrCode BundleTestTool::CreateCommandMap()
         {"getTopNLargestItemsInAppDataDir", std::bind(&BundleTestTool::RunAsGetTopNLargestItemsInAppDataDir, this)},
         {"batchGetBundleInfo", std::bind(&BundleTestTool::RunAsBatchGetBundleInfo, this)},
         {"parseSpmModule", std::bind(&BundleTestTool::RunAsParseSpmModule, this)},
+        {"getSandboxDataDirName", std::bind(&BundleTestTool::RunAsGetSandboxDataDirName, this)},
         {"implicitQueryInfos", std::bind(&BundleTestTool::RunAsImplicitQueryInfos, this)},
         {"queryAbilityInfo", std::bind(&BundleTestTool::RunAsQueryAbilityInfo, this)},
         {"batchQueryAbilityInfos", std::bind(&BundleTestTool::RunAsBatchQueryAbilityInfos, this)},
@@ -10309,6 +10327,50 @@ ErrCode BundleTestTool::RunAsBatchGetBundleInfo()
     }
     APP_LOGI("RunAsBatchGetBundleInfo end");
     return result;
+}
+
+ErrCode BundleTestTool::RunAsGetSandboxDataDirName()
+{
+    std::string bundleName;
+    int32_t appIndex = 0;
+    bool hasBundleName = false;
+    bool hasAppIndex = false;
+    int32_t option = 0;
+    while ((option = getopt_long(argc_, argv_, SHORT_OPTIONS_GET_SANDBOX_DATA_DIR_NAME.c_str(),
+        LONG_OPTIONS_GET_SANDBOX_DATA_DIR_NAME, nullptr)) != -1) {
+        switch (option) {
+            case 'h': {
+                resultReceiver_.append(HELP_MSG_GET_SANDBOX_DATA_DIR_NAME);
+                return OHOS::ERR_OK;
+            }
+            case 'n': {
+                bundleName = optarg;
+                hasBundleName = true;
+                break;
+            }
+            case 'a': {
+                if (!OHOS::StrToInt(optarg, appIndex)) {
+                    resultReceiver_.append("error: appIndex must be a signed 32-bit integer.\n");
+                    resultReceiver_.append(HELP_MSG_GET_SANDBOX_DATA_DIR_NAME);
+                    return OHOS::ERR_INVALID_VALUE;
+                }
+                hasAppIndex = true;
+                break;
+            }
+            default: {
+                resultReceiver_.append("error: unknown option or missing option value.\n");
+                resultReceiver_.append(HELP_MSG_GET_SANDBOX_DATA_DIR_NAME);
+                return OHOS::ERR_INVALID_VALUE;
+            }
+        }
+    }
+    if (!hasBundleName || !hasAppIndex || optind != argc_ - 1 || argv_[optind] != cmd_) {
+        resultReceiver_.append("error: specify both bundle name and app index without extra arguments.\n");
+        resultReceiver_.append(HELP_MSG_GET_SANDBOX_DATA_DIR_NAME);
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    resultReceiver_.append(Spm::GetSandboxDataDirName(bundleName, appIndex) + "\n");
+    return OHOS::ERR_OK;
 }
 
 ErrCode BundleTestTool::RunAsParseSpmModule()
