@@ -17,6 +17,7 @@
 #define FOUNDATION_APPEXECFWK_STANDARD_TOOLS_BM_INCLUDE_QUICK_FIX_STATUS_CALLBACK_HOST_IMPL_H
 
 #include <future>
+#include <mutex>
 
 #include "appexecfwk_errors.h"
 #include "quick_fix_status_callback_host.h"
@@ -35,6 +36,10 @@ public:
     ErrCode GetResultCode(std::shared_ptr<QuickFixResult> &quickFixRes) const;
 
 private:
+    void SetResult(const std::shared_ptr<QuickFixResult> &result);
+
+    std::mutex setValueMutex_;
+    bool isSetValue_ = false;
     mutable std::promise<std::shared_ptr<QuickFixResult>> quickFixPromise_;
 
     DISALLOW_COPY_AND_MOVE(QuickFixStatusCallbackHostlmpl);
