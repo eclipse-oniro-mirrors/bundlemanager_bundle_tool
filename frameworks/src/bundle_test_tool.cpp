@@ -45,6 +45,7 @@
 #include "permission_define.h"
 #include "iservice_registry.h"
 #include "data_group_info.h"
+#include "ipc_group_info.h"
 #include "directory_ex.h"
 #include "get_largest_items_callback_host.h"
 #include "module_info.h"
@@ -230,6 +231,7 @@ static const std::string HELP_MSG =
     "  sendCommonEvent                  send common event\n"
     "  batchSetApplicationEnabled       batch set application enabled status for clone apps\n"
     "  queryDataGroupInfos              obtain the data group infos of the application\n"
+    "  queryIpcGroupInfos               obtain the ipc group infos of the application\n"
     "  getGroupDir                      obtain the data group dir path by data group id\n"
     "  getJsonProfile                   obtain the json string of the specified module\n"
     "  getOdid                          obtain the odid of the application\n"
@@ -880,6 +882,17 @@ const std::string HELP_MSG_QUERY_DATA_GROUP_INFOS =
     "  -n, --bundle-name  <bundle-name>       specify bundle name of the application\n"
     "  -u, --user-id <user-id>                specify a user id\n";
 
+const std::string HELP_MSG_QUERY_IPC_GROUP_INFOS =
+    "usage: bundle_test_tool queryIpcGroupInfos <options>\n"
+    "eg:bundle_test_tool queryIpcGroupInfos -n <bundle-name> -u <user-id>\n"
+    "eg:bundle_test_tool queryIpcGroupInfos -n <bundle-name> -u <user-id> -f\n"
+    "options list:\n"
+    "  -h, --help                             list available commands\n"
+    "  -n, --bundle-name  <bundle-name>       specify bundle name of the application\n"
+    "  -u, --user-id <user-id>                specify a user id\n"
+    "  -f, --run-as-foundation                debug only, switch euid to 5523 before the query;\n"
+    "                                         requires root and a debug/eng image\n";
+
 const std::string HELP_MSG_GET_GROUP_DIR =
     "usage: bundle_test_tool getGroupDir <options>\n"
     "eg:bundle_test_tool getGroupDir -d <data-group-id>\n"
@@ -1271,6 +1284,9 @@ const std::string STRING_GET_APP_PROVISION_INFO_NG = "get appProvisionInfo faile
 
 const std::string STRING_QUERY_DATA_GROUP_INFOS_OK = "queryDataGroupInfos successfully\n";
 const std::string STRING_QUERY_DATA_GROUP_INFOS_NG = "queryDataGroupInfos failed\n";
+
+const std::string STRING_QUERY_IPC_GROUP_INFOS_OK = "queryIpcGroupInfos successfully\n";
+const std::string STRING_QUERY_IPC_GROUP_INFOS_NG = "queryIpcGroupInfos failed\n";
 
 const std::string STRING_GET_GROUP_DIR_OK = "getGroupDir successfully\n";
 const std::string STRING_GET_GROUP_DIR_NG = "getGroupDir failed\n";
@@ -1690,6 +1706,15 @@ const std::string SHORT_OPTIONS_GET_GROUP_DIR = "hd:";
 const struct option LONG_OPTIONS_GET_GROUP_DIR[] = {
     {"help", no_argument, nullptr, 'h'},
     {"data-group-id", required_argument, nullptr, 'd'},
+    {nullptr, 0, nullptr, 0},
+};
+
+const std::string SHORT_OPTIONS_QUERY_IPC_GROUP_INFOS = "hn:u:f";
+const struct option LONG_OPTIONS_QUERY_IPC_GROUP_INFOS[] = {
+    {"help", no_argument, nullptr, 'h'},
+    {"bundle-name", required_argument, nullptr, 'n'},
+    {"user-id", required_argument, nullptr, 'u'},
+    {"run-as-foundation", no_argument, nullptr, 'f'},
     {nullptr, 0, nullptr, 0},
 };
 
@@ -2294,6 +2319,7 @@ ErrCode BundleTestTool::CreateCommandMap()
         {"setExtNameOrMimeToApp", std::bind(&BundleTestTool::RunAsSetExtNameOrMIMEToAppCommand, this)},
         {"delExtNameOrMimeToApp", std::bind(&BundleTestTool::RunAsDelExtNameOrMIMEToAppCommand, this)},
         {"queryDataGroupInfos", std::bind(&BundleTestTool::RunAsQueryDataGroupInfos, this)},
+        {"queryIpcGroupInfos", std::bind(&BundleTestTool::RunAsQueryIpcGroupInfos, this)},
         {"getGroupDir", std::bind(&BundleTestTool::RunAsGetGroupDir, this)},
         {"getJsonProfile", std::bind(&BundleTestTool::RunAsGetJsonProfile, this)},
         {"getUninstalledBundleInfo", std::bind(&BundleTestTool::RunAsGetUninstalledBundleInfo, this)},
@@ -6440,6 +6466,142 @@ bool BundleTestTool::QueryDataGroupInfos(const std::string &bundleName,
     }
 
     return false;
+}
+
+ErrCode BundleTestTool::RunAsQueryIpcGroupInfos()
+{
+    APP_LOGI("RunAsQueryIpcGroupInfos start");
+    std::string bundleName;
+    int32_t userId = Constants::UNSPECIFIED_USERID;
+    bool runAsFoundation = false;
+    ErrCode result = ParseQueryIpcGroupInfosOptions(bundleName, userId, runAsFoundation);
+    if (result != OHOS::ERR_OK) {
+        resultReceiver_.append(HELP_MSG_QUERY_IPC_GROUP_INFOS);
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    if (userId == Constants::UNSPECIFIED_USERID) {
+        userId = BundleCommandCommon::GetCurrentUserId(userId);
+    }
+
+    uid_t originEuid = geteuid();
+    uid_t callEuid = originEuid;
+    if (runAsFoundation) {
+        // QueryIpcGroupInfos is only open to the foundation process (AMS). A shell/root caller is
+        // always rejected, so this debug-only switch changes the effective uid (restorable) to
+        // exercise the success branch on an eng image.
+        if (originEuid != static_cast<uid_t>(Constants::ROOT_UID)) {
+            resultReceiver_.append("error: -f/--run-as-foundation requires root, current euid: " +
+                std::to_string(originEuid) + "\n");
+            return OHOS::ERR_INVALID_VALUE;
+        }
+        if (seteuid(static_cast<uid_t>(Constants::FOUNDATION_UID)) != 0) {
+            APP_LOGE("failed to switch euid to foundation, errno: %{public}d", errno);
+            resultReceiver_.append("error: failed to switch euid to foundation\n");
+            return OHOS::ERR_INVALID_VALUE;
+        }
+        callEuid = static_cast<uid_t>(Constants::FOUNDATION_UID);
+    }
+
+    std::string msg;
+    result = QueryIpcGroupInfos(bundleName, userId, msg);
+    if (runAsFoundation && seteuid(originEuid) != 0) {
+        APP_LOGE("failed to restore euid, errno: %{public}d", errno);
+    }
+
+    resultReceiver_.append("bundleName: " + bundleName + ", userId: " + std::to_string(userId) + "\n");
+    resultReceiver_.append("caller euid: " + std::to_string(callEuid) + "\n");
+    resultReceiver_.append("result: " + std::to_string(result) + "\n");
+    if (result == OHOS::ERR_OK) {
+        resultReceiver_.append(STRING_QUERY_IPC_GROUP_INFOS_OK + msg);
+        return OHOS::ERR_OK;
+    }
+    resultReceiver_.append(STRING_QUERY_IPC_GROUP_INFOS_NG);
+    resultReceiver_.append(GetIpcGroupQueryHint(result));
+    return OHOS::ERR_INVALID_VALUE;
+}
+
+ErrCode BundleTestTool::QueryIpcGroupInfos(const std::string &bundleName, int32_t userId, std::string &msg)
+{
+    if (bundleMgrProxy_ == nullptr) {
+        APP_LOGE("bundleMgrProxy_ is nullptr");
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    std::vector<IpcGroupInfo> infos;
+    ErrCode ret = bundleMgrProxy_->QueryIpcGroupInfos(bundleName, userId, infos);
+    if (ret != OHOS::ERR_OK) {
+        APP_LOGE("QueryIpcGroupInfos failed, ret: %{public}d", ret);
+        return ret;
+    }
+    msg = "ipcGroupInfos:\n{\n";
+    for (const auto &ipcGroupInfo : infos) {
+        msg += "     ";
+        msg += ipcGroupInfo.ToString();
+        msg += "\n";
+    }
+    msg += "}\n";
+    return OHOS::ERR_OK;
+}
+
+std::string BundleTestTool::GetIpcGroupQueryHint(ErrCode ret) const
+{
+    if (ret == ERR_BUNDLE_MANAGER_PERMISSION_DENIED) {
+        return "hint: the caller uid is not the foundation process (5523). Verify AC-12 from shell; "
+            "use -f/--run-as-foundation as root on an eng image to reach the success branch.\n";
+    }
+    if (ret == ERR_BUNDLE_MANAGER_BUNDLE_NOT_EXIST) {
+        return "hint: bundle is not installed for this userId.\n";
+    }
+    return "";
+}
+
+ErrCode BundleTestTool::ParseQueryIpcGroupInfosOptions(std::string &bundleName, int32_t &userId,
+    bool &runAsFoundation)
+{
+    int32_t counter = 0;
+    while (true) {
+        counter++;
+        int32_t option = getopt_long(argc_, argv_, SHORT_OPTIONS_QUERY_IPC_GROUP_INFOS.c_str(),
+            LONG_OPTIONS_QUERY_IPC_GROUP_INFOS, nullptr);
+        APP_LOGD("option: %{public}d, optopt: %{public}d, optind: %{public}d", option, optopt, optind);
+        if (optind < 0 || optind > argc_) {
+            return OHOS::ERR_INVALID_VALUE;
+        }
+        if (option == -1) {
+            if (counter == 1) {
+                // 'bundle_test_tool queryIpcGroupInfos' with no option
+                return OHOS::ERR_INVALID_VALUE;
+            }
+            break;
+        }
+        switch (option) {
+            case 'h':
+                return OHOS::ERR_INVALID_VALUE;
+            case 'n':
+                bundleName = optarg;
+                break;
+            case 'u':
+                if (!OHOS::StrToInt(optarg, userId) || userId < 0) {
+                    resultReceiver_.append(STRING_REQUIRE_CORRECT_VALUE);
+                    return OHOS::ERR_INVALID_VALUE;
+                }
+                break;
+            case 'f':
+                runAsFoundation = true;
+                break;
+            case '?': {
+                std::string unknownOption;
+                resultReceiver_.append(GetUnknownOptionMsg(unknownOption));
+                return OHOS::ERR_INVALID_VALUE;
+            }
+            default:
+                return OHOS::ERR_INVALID_VALUE;
+        }
+    }
+    if (bundleName.empty()) {
+        resultReceiver_.append(HELP_MSG_NO_BUNDLE_NAME_OPTION + "\n");
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    return OHOS::ERR_OK;
 }
 
 ErrCode BundleTestTool::RunAsGetGroupDir()
