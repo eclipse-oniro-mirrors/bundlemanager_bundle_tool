@@ -6486,8 +6486,8 @@ ErrCode BundleTestTool::RunAsQueryIpcGroupInfos()
     uid_t originEuid = geteuid();
     uid_t callEuid = originEuid;
     if (runAsFoundation) {
-        // QueryIpcGroupInfos is only open to the foundation process (AMS). A shell/root caller is
-        // always rejected, so this debug-only switch changes the effective uid (restorable) to
+        // QueryIpcGroupInfos is only open to the foundation process (uid 5523). A shell/root caller
+        // is always rejected, so this debug-only switch changes the effective uid (restorable) to
         // exercise the success branch on an eng image.
         if (originEuid != static_cast<uid_t>(Constants::ROOT_UID)) {
             resultReceiver_.append("error: -f/--run-as-foundation requires root, current euid: " +
@@ -6557,21 +6557,14 @@ std::string BundleTestTool::GetIpcGroupQueryHint(ErrCode ret) const
 ErrCode BundleTestTool::ParseQueryIpcGroupInfosOptions(std::string &bundleName, int32_t &userId,
     bool &runAsFoundation)
 {
-    int32_t counter = 0;
-    while (true) {
-        counter++;
-        int32_t option = getopt_long(argc_, argv_, SHORT_OPTIONS_QUERY_IPC_GROUP_INFOS.c_str(),
-            LONG_OPTIONS_QUERY_IPC_GROUP_INFOS, nullptr);
+    bool hasOption = false;
+    int32_t option = getopt_long(argc_, argv_, SHORT_OPTIONS_QUERY_IPC_GROUP_INFOS.c_str(),
+        LONG_OPTIONS_QUERY_IPC_GROUP_INFOS, nullptr);
+    while (option != -1) {
+        hasOption = true;
         APP_LOGD("option: %{public}d, optopt: %{public}d, optind: %{public}d", option, optopt, optind);
         if (optind < 0 || optind > argc_) {
             return OHOS::ERR_INVALID_VALUE;
-        }
-        if (option == -1) {
-            if (counter == 1) {
-                // 'bundle_test_tool queryIpcGroupInfos' with no option
-                return OHOS::ERR_INVALID_VALUE;
-            }
-            break;
         }
         switch (option) {
             case 'h':
@@ -6596,6 +6589,12 @@ ErrCode BundleTestTool::ParseQueryIpcGroupInfosOptions(std::string &bundleName, 
             default:
                 return OHOS::ERR_INVALID_VALUE;
         }
+        option = getopt_long(argc_, argv_, SHORT_OPTIONS_QUERY_IPC_GROUP_INFOS.c_str(),
+            LONG_OPTIONS_QUERY_IPC_GROUP_INFOS, nullptr);
+    }
+    if (!hasOption) {
+        // 'bundle_test_tool queryIpcGroupInfos' without any option
+        return OHOS::ERR_INVALID_VALUE;
     }
     if (bundleName.empty()) {
         resultReceiver_.append(HELP_MSG_NO_BUNDLE_NAME_OPTION + "\n");
