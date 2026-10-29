@@ -227,9 +227,7 @@ ohos_executable("bundle_test_tool") {
 
   deps = [ ":tools_test_bm_source_set" ]
 
-  # Temporarily installed so the test team can run queryIpcGroupInfos on the test image.
-  # TODO(ipcGroup): restore to false before the release merge.
-  install_enable = true
+  install_enable = false
 
   external_deps = [ "hilog:libhilog" ]
 

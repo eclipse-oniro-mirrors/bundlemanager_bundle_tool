@@ -6545,8 +6545,8 @@ ErrCode BundleTestTool::QueryIpcGroupInfos(const std::string &bundleName, int32_
 std::string BundleTestTool::GetIpcGroupQueryHint(ErrCode ret) const
 {
     if (ret == ERR_BUNDLE_MANAGER_PERMISSION_DENIED) {
-        return "hint: the caller uid is not the foundation process (5523). Verify AC-12 from shell; "
-            "use -f/--run-as-foundation as root on an eng image to reach the success branch.\n";
+        return "hint: access denied. Either the caller is not the foundation process (5523), or the "
+            "query targets another user without ohos.permission.INTERACT_ACROSS_LOCAL_ACCOUNTS.\n";
     }
     if (ret == ERR_BUNDLE_MANAGER_BUNDLE_NOT_EXIST) {
         return "hint: bundle is not installed for this userId.\n";
