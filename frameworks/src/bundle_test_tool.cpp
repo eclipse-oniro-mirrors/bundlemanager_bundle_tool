@@ -54,6 +54,7 @@
 #include "nativetoken_kit.h"
 #include "token_setproc.h"
 #include "spm_module_parser.h"
+#include "atm_bundle_recovery_info.h"
 #include "system_ability_definition.h"
 #include "bundle_stats_callback_host.h"
 #ifdef BUNDLE_FRAMEWORK_QUICK_FIX
@@ -277,6 +278,7 @@ static const std::string HELP_MSG =
     "  setEnpDevice                     set ENP device\n"
     "  installEnterpriseResignCert      install an enterprise resign cert\n"
     "  uninstallEnterpriseReSignatureCert    uninstall enterprise re sign cert\n"
+    "  queryAtmRecoveryInfo             query ATM recovery information (no arguments)\n"
     "  getEnterpriseReSignatureCert          get enterprise re sign cert\n"
     "  getApiTargetVersionByUid          get api target version by uid\n"
     "  getTopNLargestItemsInAppDataDir  get top N largest items in app data dir\n"
@@ -2274,6 +2276,7 @@ ErrCode BundleTestTool::CreateCommandMap()
 {
     commandMap_ = {
         {"help", std::bind(&BundleTestTool::RunAsHelpCommand, this)},
+        {"queryAtmRecoveryInfo", std::bind(&BundleTestTool::RunAsQueryAtmRecoveryInfo, this)},
         {"check", std::bind(&BundleTestTool::RunAsCheckCommand, this)},
         {"setrm", std::bind(&BundleTestTool::RunAsSetRemovableCommand, this)},
         {"getrm", std::bind(&BundleTestTool::RunAsGetRemovableCommand, this)},
@@ -10496,6 +10499,28 @@ ErrCode BundleTestTool::RunAsParseSpmModule()
     }
     APP_LOGI("RunAsParseSpmModule end");
     return result;
+}
+
+ErrCode BundleTestTool::RunAsQueryAtmRecoveryInfo()
+{
+    if (argc_ != MIN_ARGUMENT_NUMBER) {
+        resultReceiver_ = "usage: bundle_test_tool queryAtmRecoveryInfo\n";
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    const auto result = QueryAtmBundleRecoveryInfo();
+    std::ostringstream output;
+    output << "code=" << result.code << "\ncount=" << result.infos.size() << "\n";
+    for (const auto &info : result.infos) {
+        const nlohmann::json record = {
+            {"bundleName", info.bundleName}, {"userId", info.userId}, {"appIndex", info.appIndex},
+            {"accessTokenId", info.accessTokenId}, {"accessTokenIdEx", info.accessTokenIdEx}, {"uid", info.uid},
+            {"hapPaths", info.hapPaths},{"mode", info.mode}, {"isPreInstallApp", info.isPreInstallApp},
+            {"isUninstalled", info.isUninstalled}
+        };
+        output << record.dump() << "\n";
+    }
+    resultReceiver_ = output.str();
+    return OHOS::ERR_OK;
 }
 
 ErrCode BundleTestTool::RunAsGetTopNLargestItemsInAppDataDir()

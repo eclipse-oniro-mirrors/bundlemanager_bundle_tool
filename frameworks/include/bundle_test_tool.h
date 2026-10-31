@@ -223,6 +223,7 @@ private:
     ErrCode ParseDeleteResourceInfoOptions(std::string &key);
     ErrCode ExecuteDeleteResourceInfo(const std::string &key);
     ErrCode RunAsGetMainAndCloneBundleInfo();
+    ErrCode RunAsQueryAtmRecoveryInfo();
     ErrCode RunAsQuerySandboxCloneAbilityInfo();
     ErrCode ParseQuerySandboxCloneAbilityInfoOptions(std::string &creatorBundleName,
         std::string &bundleName, std::string &moduleName, std::string &abilityName,
