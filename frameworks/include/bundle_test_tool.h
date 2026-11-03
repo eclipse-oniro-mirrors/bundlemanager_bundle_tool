@@ -104,6 +104,7 @@ private:
     ErrCode RunAsSetExtNameOrMIMEToAppCommand();
     ErrCode RunAsDelExtNameOrMIMEToAppCommand();
     ErrCode RunAsQueryDataGroupInfos();
+    ErrCode RunAsQueryIpcGroupInfos();
     ErrCode RunAsGetGroupDir();
     ErrCode RunAsGetJsonProfile();
     ErrCode RunAsGetUninstalledBundleInfo();
@@ -305,6 +306,9 @@ private:
     ErrCode CheckGetDistributedBundleNameCorrectOption(int32_t option, const std::string &commandName,
         std::string &networkId, int32_t &accessTokenId);
     bool QueryDataGroupInfos(const std::string &bundleName, int32_t userId, std::string& msg);
+    ErrCode QueryIpcGroupInfos(const std::string &bundleName, int32_t userId, std::string &msg);
+    ErrCode ParseQueryIpcGroupInfosOptions(std::string &bundleName, int32_t &userId, bool &runAsFoundation);
+    std::string GetIpcGroupQueryHint(ErrCode ret) const;
     bool ParseEventCallbackOptions(bool &onlyUnregister, int32_t &uid);
     bool ParsePluginEventCallbackOptions(bool &onlyUnregister, int32_t &uid);
     bool ParseResetAOTCompileStatusOptions(std::string &bundleName, std::string &moduleName,
