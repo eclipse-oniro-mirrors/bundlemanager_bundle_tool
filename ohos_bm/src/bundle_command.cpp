@@ -1397,11 +1397,13 @@ ErrCode BundleManagerShellCommand::RunAsCleanCommand()
                     APP_LOGE("cJSON_PrintUnformatted failed");
                     resultReceiver_ = CreateErrorResult(ERR_APPEXECFWK_SERVICE_INTERNAL_ERROR,
                         "error: failed to format JSON result.");
+                    cJSON_Delete(cleanResult);
                     return OHOS::ERR_INVALID_VALUE;
                 }
             } else {
                 resultReceiver_ = CreateErrorResult(
                     ERR_APPEXECFWK_SERVICE_INTERNAL_ERROR, STRING_CLEAN_CACHE_BUNDLE_NG);
+                cJSON_Delete(cleanResult);
                 return OHOS::ERR_INVALID_VALUE;
             }
         }
@@ -1416,11 +1418,13 @@ ErrCode BundleManagerShellCommand::RunAsCleanCommand()
                     APP_LOGE("cJSON_PrintUnformatted failed");
                     resultReceiver_ = CreateErrorResult(ERR_APPEXECFWK_SERVICE_INTERNAL_ERROR,
                         "error: failed to format JSON result.");
+                    cJSON_Delete(cleanResult);
                     return OHOS::ERR_INVALID_VALUE;
                 }
             } else {
                 resultReceiver_ = CreateErrorResult(
                     ERR_APPEXECFWK_SERVICE_INTERNAL_ERROR, STRING_CLEAN_DATA_BUNDLE_NG);
+                cJSON_Delete(cleanResult);
                 return OHOS::ERR_INVALID_VALUE;
             }
         }
