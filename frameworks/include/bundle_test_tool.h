@@ -67,6 +67,10 @@ private:
     ErrCode RunAsUninstallPreInstallBundleCommand();
     ErrCode RunAsDumpSandboxCommand();
     ErrCode RunAsInstallCommand();
+    ErrCode RunAsInstallExistedCommand();
+    ErrCode ParseInstallExistedOptions(
+        std::string &bundleName, int32_t &userId, int32_t &euid, std::string &permissionMode);
+    bool ReloadInstallExistedTokenInfo(int32_t euid, const std::string &permissionMode);
     ErrCode RunAsUninstallEnterpriseReSignCert();
     ErrCode RunAsGetEnterpriseReSignCert();
     ErrCode RunAsGetStringCommand();

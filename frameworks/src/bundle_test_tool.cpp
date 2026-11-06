@@ -34,6 +34,7 @@
 #include "app_log_wrapper.h"
 #include "appexecfwk_errors.h"
 #include "bundle_command_common.h"
+#include "bundle_constants.h"
 #include "bundle_death_recipient.h"
 #include "bundle_dir.h"
 #include "bundle_mgr_client.h"
@@ -94,6 +95,10 @@ const int32_t MINIMUM_WAITTING_TIME = 180; // 3 mins
 const char* BMS_PARA_INSTALL_ALLOW_DOWNGRADE = "ohos.bms.param.installAllowDowngrade";
 const char* BMS_PARA_INSTALL_GRANT_PERMISSION = "ohos.bms.param.installAddPermission";
 const char* BMS_PARA_INSTALL_DEVICE_MODE_DISTRIBUTION_POLICY = "ohos.bms.param.deviceModeDistributionPolicy";
+const std::string INSTALL_EXISTED_PERMISSION_INSTALL_BUNDLE = "install_bundle";
+const std::string INSTALL_EXISTED_PERMISSION_MANAGE_EDM_POLICY = "manage_edm_policy";
+const std::string INSTALL_EXISTED_PERMISSION_BOTH = "both";
+const std::string INSTALL_EXISTED_PERMISSION_NONE = "none";
 
 // mirror InstallParam::RefreshDeviceModeDistributionPolicy parsing rules:
 // non-empty, digits only, decimal value within enum range (0~8)
@@ -192,6 +197,7 @@ static const std::string HELP_MSG =
     "  setrm                            set module isRemovable by given bundle name and module name\n"
     "  getrm                            obtain the value of isRemovable by given bundle name and module name\n"
     "  installSandbox                   indicates install sandbox\n"
+    "  installExisted                   install an existing application for a specified user\n"
     "  uninstallSandbox                 indicates uninstall sandbox\n"
     "  uninstallPreInstallBundle        indicates uninstall preinstall bundle\n"
     "  dumpSandbox                      indicates dump sandbox info\n"
@@ -806,6 +812,20 @@ const std::string HELP_MSG_INSTALL =
     "                                                                    in range 0~8, e.g. 4 for universal\n"
     "                                                                    different-package\n";
 
+const std::string HELP_MSG_INSTALL_EXISTED =
+    "usage: bundle_test_tool installExisted <options>\n"
+    "eg:bundle_test_tool installExisted -n <bundle-name> -u <user-id>\n"
+    "eg:bundle_test_tool installExisted -n <bundle-name> -u <user-id> -e 3057\n"
+    "eg:bundle_test_tool installExisted -n <bundle-name> -u <user-id> -e 3057 -p none\n"
+    "options list:\n"
+    "  -h, --help                             list available commands\n"
+    "  -n, --bundle-name <bundle-name>        specify bundle name of the existing application\n"
+    "  -u, --user-id <user-id>                specify the target user id\n"
+    "  -e, --euid <euid>                      specify caller euid, defaults to non-EDM root uid\n"
+    "  -p, --permission <permission>          install_bundle, manage_edm_policy, both, or none\n"
+    "                                         defaults to install_bundle for non-EDM uid,\n"
+    "                                         and manage_edm_policy for EDM uid 3057\n";
+
 const std::string HELP_MSG_NO_BUNDLE_PATH_OPTION =
     "error: you must specify a bundle path with '-p' or '--bundle-path'.";
 
@@ -1246,6 +1266,10 @@ const std::string STRING_REQUIRE_CORRECT_VALUE =
 
 const std::string STRING_INSTALL_SANDBOX_SUCCESSFULLY = "install sandbox app successfully \n";
 const std::string STRING_INSTALL_SANDBOX_FAILED = "install sandbox app failed \n";
+const std::string STRING_INSTALL_EXISTED_SUCCESSFULLY = "install existed app successfully\n";
+const std::string STRING_INSTALL_EXISTED_FAILED = "install existed app failed\n";
+const std::string STRING_SET_EUID_FAILED = "error: failed to set effective uid\n";
+const std::string STRING_SET_ACCESS_TOKEN_FAILED = "error: failed to set caller access token\n";
 
 const std::string STRING_UPDATE_APP_EXCRYPTED_STATUS_SUCCESSFULLY = "update app encrypted status successfully \n";
 const std::string STRING_UPDATE_APP_EXCRYPTED_STATUS_FAILED = "update app encrypted status failed \n";
@@ -2043,6 +2067,16 @@ const struct option LONG_OPTIONS_PREINSTALL[] = {
     {nullptr, 0, nullptr, 0},
 };
 
+const std::string SHORT_OPTIONS_INSTALL_EXISTED = "hn:u:e:p:";
+const struct option LONG_OPTIONS_INSTALL_EXISTED[] = {
+    {"help", no_argument, nullptr, 'h'},
+    {"bundle-name", required_argument, nullptr, 'n'},
+    {"user-id", required_argument, nullptr, 'u'},
+    {"euid", required_argument, nullptr, 'e'},
+    {"permission", required_argument, nullptr, 'p'},
+    {nullptr, 0, nullptr, 0},
+};
+
 const std::string SHORT_OPTIONS_GET_ASSET_ACCESS_GROUPS = "hn:";
 const struct option LONG_OPTIONS_GET_ASSET_ACCESS_GROUPS[] = {
     {"help", no_argument, nullptr, 'h'},
@@ -2394,6 +2428,7 @@ ErrCode BundleTestTool::CreateCommandMap()
             std::bind(&BundleTestTool::RunAsGetSimpleAppInfoForUid, this)},
         {"getBundleNameByAppId",
             std::bind(&BundleTestTool::RunAsGetBundleNameByAppId, this)},
+        {"installExisted", std::bind(&BundleTestTool::RunAsInstallExistedCommand, this)},
         {"uninstallPreInstallBundle", std::bind(&BundleTestTool::RunAsUninstallPreInstallBundleCommand, this)},
         {"getAssetAccessGroups",
             std::bind(&BundleTestTool::RunAsGetAssetAccessGroups, this)},
@@ -10035,6 +10070,129 @@ ErrCode BundleTestTool::RunAsUninstallPreInstallBundleCommand()
     } else {
         resultReceiver_ = STRING_UNINSTALL_PREINSTALL_BUNDLE_FAILED + "\n";
         resultReceiver_.append(GetMessageFromCode(result));
+    }
+    return result;
+}
+
+ErrCode BundleTestTool::ParseInstallExistedOptions(
+    std::string &bundleName, int32_t &userId, int32_t &euid, std::string &permissionMode)
+{
+    bool parseResult = true;
+    bool hasBundleName = false;
+    bool hasUserId = false;
+    const std::string commandName = "installExisted";
+    euid = Constants::ROOT_UID;
+    permissionMode.clear();
+    while (true) {
+        int32_t option = getopt_long(
+            argc_, argv_, SHORT_OPTIONS_INSTALL_EXISTED.c_str(), LONG_OPTIONS_INSTALL_EXISTED, nullptr);
+        if (optind < 0 || optind > argc_) {
+            return OHOS::ERR_INVALID_VALUE;
+        }
+        if (option == -1) {
+            break;
+        }
+        switch (option) {
+            case 'n':
+                bundleName = optarg;
+                hasBundleName = !bundleName.empty();
+                break;
+            case 'u':
+                StringToInt(optarg, commandName, userId, parseResult);
+                hasUserId = parseResult;
+                break;
+            case 'e':
+                StringToInt(optarg, commandName, euid, parseResult);
+                parseResult = parseResult && (euid >= 0);
+                break;
+            case 'p':
+                permissionMode = optarg;
+                parseResult = parseResult &&
+                    (permissionMode == INSTALL_EXISTED_PERMISSION_INSTALL_BUNDLE ||
+                    permissionMode == INSTALL_EXISTED_PERMISSION_MANAGE_EDM_POLICY ||
+                    permissionMode == INSTALL_EXISTED_PERMISSION_BOTH ||
+                    permissionMode == INSTALL_EXISTED_PERMISSION_NONE);
+                break;
+            case 'h':
+            default:
+                return OHOS::ERR_INVALID_VALUE;
+        }
+    }
+    if (permissionMode.empty()) {
+        permissionMode = euid == Constants::EDM_UID ? INSTALL_EXISTED_PERMISSION_MANAGE_EDM_POLICY :
+            INSTALL_EXISTED_PERMISSION_INSTALL_BUNDLE;
+    }
+    return parseResult && hasBundleName && hasUserId ? OHOS::ERR_OK : OHOS::ERR_INVALID_VALUE;
+}
+
+bool BundleTestTool::ReloadInstallExistedTokenInfo(int32_t euid, const std::string &permissionMode)
+{
+    const char *permissions[2] = { nullptr, nullptr };
+    int32_t permsNum = 0;
+    if (permissionMode == INSTALL_EXISTED_PERMISSION_INSTALL_BUNDLE ||
+        permissionMode == INSTALL_EXISTED_PERMISSION_BOTH) {
+        permissions[permsNum++] = "ohos.permission.INSTALL_BUNDLE";
+    }
+    if (permissionMode == INSTALL_EXISTED_PERMISSION_MANAGE_EDM_POLICY ||
+        permissionMode == INSTALL_EXISTED_PERMISSION_BOTH) {
+        permissions[permsNum++] = "ohos.permission.MANAGE_EDM_POLICY";
+    }
+    NativeTokenInfoParams infoInstance = {
+        .dcapsNum = 0,
+        .permsNum = permsNum,
+        .aclsNum = 0,
+        .dcaps = nullptr,
+        .perms = permsNum == 0 ? nullptr : permissions,
+        .acls = nullptr,
+        .processName = "bundleTestToolInstallExisted",
+        .aplStr = "system_core",
+        .uid = euid,
+    };
+    uint64_t tokenId = GetAccessTokenId(&infoInstance);
+    if (tokenId == 0 || SetSelfTokenID(tokenId) != 0) {
+        APP_LOGE("failed to set access token for InstallExisted");
+        return false;
+    }
+    OHOS::Security::AccessToken::AccessTokenKit::ReloadNativeTokenInfo();
+    return true;
+}
+
+ErrCode BundleTestTool::RunAsInstallExistedCommand()
+{
+    std::string bundleName;
+    std::string permissionMode;
+    int32_t userId = 0;
+    int32_t euid = Constants::ROOT_UID;
+    ErrCode result = ParseInstallExistedOptions(bundleName, userId, euid, permissionMode);
+    if (result != OHOS::ERR_OK) {
+        resultReceiver_.append(HELP_MSG_INSTALL_EXISTED);
+        return result;
+    }
+    const uint64_t originalTokenId = GetSelfTokenID();
+    const uid_t originalEuid = geteuid();
+    if (!ReloadInstallExistedTokenInfo(euid, permissionMode)) {
+        resultReceiver_.append(STRING_SET_ACCESS_TOKEN_FAILED);
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    if (seteuid(static_cast<uid_t>(euid)) != 0) {
+        (void)SetSelfTokenID(originalTokenId);
+        OHOS::Security::AccessToken::AccessTokenKit::ReloadNativeTokenInfo();
+        resultReceiver_.append(STRING_SET_EUID_FAILED);
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    result = bundleInstallerProxy_->InstallExisted(bundleName, userId);
+    if (seteuid(originalEuid) != 0) {
+        APP_LOGE("failed to restore effective uid after InstallExisted");
+    }
+    if (SetSelfTokenID(originalTokenId) != 0) {
+        APP_LOGE("failed to restore access token after InstallExisted");
+    }
+    OHOS::Security::AccessToken::AccessTokenKit::ReloadNativeTokenInfo();
+    if (result == OHOS::ERR_OK) {
+        resultReceiver_.append(STRING_INSTALL_EXISTED_SUCCESSFULLY);
+    } else {
+        resultReceiver_.append(STRING_INSTALL_EXISTED_FAILED);
+        resultReceiver_.append("ErrCode is " + std::to_string(result) + ".\n");
     }
     return result;
 }
