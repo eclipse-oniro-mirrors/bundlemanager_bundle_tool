@@ -7225,17 +7225,21 @@ ErrCode BundleTestTool::RunAsGetOdid()
 {
     std::string commandName = "getOdid";
     int uid = Constants::INVALID_UID;
+    bool ret = true;
     int opt = 0;
 
     const std::map<char, OptionHandler> getOdidOptionHandlers = {
-        {'u', [&uid, &commandName, this](const std::string& value) {
-            bool ret;
+        {'u', [&uid, &commandName, &ret, this](const std::string& value) {
             StringToInt(value, commandName, uid, ret); }}
     };
     while ((opt = getopt_long(argc_, argv_, SHORT_OPTIONS_GET_ODID.c_str(), LONG_OPTIONS_GET_ODID, nullptr)) != -1) {
         auto it = getOdidOptionHandlers.find(opt);
         if (it != getOdidOptionHandlers.end()) {
             it->second(optarg);
+            if (!ret) {
+                resultReceiver_.append(HELP_MSG_GET_ODID);
+                return OHOS::ERR_INVALID_VALUE;
+            }
         } else {
             resultReceiver_.append(HELP_MSG_GET_ODID);
             return OHOS::ERR_INVALID_VALUE;
@@ -7313,14 +7317,13 @@ ErrCode BundleTestTool::RunAsUpdateAppEncryptedStatus()
     int appIndex = 0;
     int appEcrypted = 0;
     std::string bundleName;
+    bool ret = true;
     int opt = 0;
 
     const std::map<char, OptionHandler> optionHandlers = {
-        {'a', [&appIndex, &commandName, this](const std::string& value) {
-            bool ret;
+        {'a', [&appIndex, &commandName, &ret, this](const std::string& value) {
             StringToInt(value, commandName, appIndex, ret); }},
-        {'e', [&appEcrypted, &commandName, this](const std::string& value) {
-            bool ret;
+        {'e', [&appEcrypted, &commandName, &ret, this](const std::string& value) {
             StringToInt(value, commandName, appEcrypted, ret); }},
         {'n', [&bundleName, &commandName, this](const std::string& value) {
             bundleName = value; }},
@@ -7331,6 +7334,10 @@ ErrCode BundleTestTool::RunAsUpdateAppEncryptedStatus()
         auto it = optionHandlers.find(opt);
         if (it != optionHandlers.end()) {
             it->second(optarg);
+            if (!ret) {
+                resultReceiver_.append(HELP_MSG_UPDATE_APP_EXCRYPTED_STATUS);
+                return OHOS::ERR_INVALID_VALUE;
+            }
         } else {
             resultReceiver_.append(HELP_MSG_UPDATE_APP_EXCRYPTED_STATUS);
             return OHOS::ERR_INVALID_VALUE;
