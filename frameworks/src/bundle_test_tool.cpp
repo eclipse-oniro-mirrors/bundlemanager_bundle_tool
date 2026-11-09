@@ -255,6 +255,7 @@ static const std::string HELP_MSG =
     "  getDirByBundleNameAndAppIndex    obtain the dir by bundleName and appIndex\n"
     "  getAllBundleDirs                 obtain all bundle dirs \n"
     "  getAllJsonProfile                obtain all json profile\n"
+    "  getLaunchServices                obtain the launch services of the specified module\n"
     "  setApplicationDisableForbidden   set whether a specified application is forbidden to be disabled\n"
     "  setDefaultApplicationForCustom   set default application for enterprise customization\n"
     "  getAllBundleCacheStat            obtain all bundle cache size \n"
@@ -917,6 +918,15 @@ const std::string HELP_MSG_GET_ALL_JSON_PROFILE =
     "  -p, --profile-type <profile-type>      specify a profile-type\n"
     "  -u, --user-id <user-id>                specify a user id\n";
 
+const std::string HELP_MSG_LAUNCH_SERVICES =
+    "usage: bundle_test_tool getLaunchServices <options>\n"
+    "eg:bundle_test_tool getLaunchServices -n <bundle-name> -m <module-name> -u <user-id>\n"
+    "options list:\n"
+    "  -h, --help                             list available commands\n"
+    "  -n, --bundle-name <bundle-name>        specify a bundle name\n"
+    "  -m, --module-name <module-name>        specify a module name\n"
+    "  -u, --user-id <user-id>                specify a user id\n";
+
 const std::string HELP_MSG_SET_APPLICATION_DISABLE_FORBIDDEN =
     "usage: bundle_test_tool setApplicationDisableForbidden <options>\n"
     "eg:bundle_test_tool setApplicationDisableForbidden\n"
@@ -1315,6 +1325,9 @@ const std::string STRING_GET_ALL_BUNDLE_DIRS_NG = "getAllBundleDirs failed\n";
 
 const std::string STRING_GET_ALL_JSON_PROFILE_OK = "getAllJsonProfile successfully\n";
 const std::string STRING_GET_ALL_JSON_PROFILE_NG = "getAllJsonProfile failed\n";
+
+const std::string STRING_GET_LAUNCH_SERVICES_OK = "getLaunchServices successfully\n";
+const std::string STRING_GET_LAUNCH_SERVICES_NG = "getLaunchServices failed\n";
 
 const std::string STRING_SET_APPLICATION_DISABLE_FORBIDDEN_OK = "setApplicationDisableForbidden successfully\n";
 const std::string STRING_SET_APPLICATION_DISABLE_FORBIDDEN_NG = "setApplicationDisableForbidden failed\n";
@@ -1872,6 +1885,15 @@ const struct option LONG_OPTIONS_GET_ALL_JSON_PROFILE[] = {
     {nullptr, 0, nullptr, 0},
 };
 
+const std::string SHORT_OPTIONS_GET_LAUNCH_SERVICES = "hn:m:u:";
+const struct option LONG_OPTIONS_GET_LAUNCH_SERVICES[] = {
+    {"help", no_argument, nullptr, 'h'},
+    {"bundle-name", required_argument, nullptr, 'n'},
+    {"module-name", required_argument, nullptr, 'm'},
+    {"user-id", required_argument, nullptr, 'u'},
+    {nullptr, 0, nullptr, 0},
+};
+
 const std::string SHORT_OPTIONS_SET_APPLICATION_DISABLE_FORBIDDEN = "hn:u:a:f:c:";
 const struct option LONG_OPTIONS_SET_APPLICATION_DISABLE_FORBIDDEN[] = {
     {"help", no_argument, nullptr, 'h'},
@@ -2322,6 +2344,8 @@ ErrCode BundleTestTool::CreateCommandMap()
             std::bind(&BundleTestTool::RunAsGetAllBundleDirs, this)},
         {"getAllJsonProfile",
             std::bind(&BundleTestTool::RunAsGetAllJsonProfile, this)},
+        {"getLaunchServices",
+            std::bind(&BundleTestTool::RunAsGetLaunchServices, this)},
         {"setApplicationDisableForbidden",
             std::bind(&BundleTestTool::RunAsSetApplicationDisableForbidden, this)},
         {"setDefaultApplicationForCustom",
@@ -8274,6 +8298,85 @@ ErrCode BundleTestTool::GetAllJsonProfile(ProfileType profileType, int32_t userI
             msg +="     ";
             msg += info.ToString();
             msg += "\n";
+        }
+        msg += "}\n";
+    }
+    return ret;
+}
+
+ErrCode BundleTestTool::RunAsGetLaunchServices()
+{
+    APP_LOGI("RunAsGetLaunchServices start");
+    std::string commandName = "getLaunchServices";
+    int32_t result = OHOS::ERR_OK;
+    std::string name = "";
+    std::string bundleName = "";
+    std::string moduleName = "";
+    int32_t userId = 100;
+    int32_t option = getopt_long(argc_, argv_, SHORT_OPTIONS_GET_LAUNCH_SERVICES.c_str(),
+        LONG_OPTIONS_GET_LAUNCH_SERVICES, nullptr);
+    if (optind < 0 || optind > argc_) {
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    if (option == -1) {
+        // When scanning the first argument
+        if (strcmp(argv_[optind], cmd_.c_str()) == 0) {
+            APP_LOGD("bundle_test_tool getLaunchServices with no option.");
+            resultReceiver_.append(HELP_MSG_LAUNCH_SERVICES);
+            return OHOS::ERR_INVALID_VALUE;
+        }
+    }
+    while (option != -1) {
+        APP_LOGD("option: %{public}d, optopt: %{public}d, optind: %{public}d", option, optopt, optind);
+        int temp = 0;
+        result = !CheckGetStringCorrectOption(option, commandName, temp, name)
+            ? OHOS::ERR_INVALID_VALUE : result;
+        bundleName = option == 'n' ? name : bundleName;
+        moduleName = option == 'm' ? name : moduleName;
+        userId = option == 'u' ? temp : userId;
+        option = getopt_long(argc_, argv_, SHORT_OPTIONS_GET_LAUNCH_SERVICES.c_str(),
+            LONG_OPTIONS_GET_LAUNCH_SERVICES, nullptr);
+        if (optind < 0 || optind > argc_) {
+            return OHOS::ERR_INVALID_VALUE;
+        }
+    }
+    if (result != OHOS::ERR_OK) {
+        resultReceiver_.append(HELP_MSG_LAUNCH_SERVICES);
+    } else {
+        std::string msg;
+        result = GetLaunchServices(bundleName, moduleName, userId, msg);
+        if (result == ERR_OK) {
+            resultReceiver_.append(STRING_GET_LAUNCH_SERVICES_OK + msg);
+        } else {
+            resultReceiver_.append(STRING_GET_LAUNCH_SERVICES_NG + "errCode is " + std::to_string(result) + "\n");
+        }
+    }
+    APP_LOGI("RunAsGetLaunchServices end");
+    return result;
+}
+
+ErrCode BundleTestTool::GetLaunchServices(const std::string &bundleName, const std::string &moduleName,
+    int32_t userId, std::string& msg)
+{
+    if (bundleMgrProxy_ == nullptr) {
+        APP_LOGE("bundleMgrProxy_ is nullptr");
+        return ERR_APPEXECFWK_NULL_PTR;
+    }
+    LaunchServicesResult launchServicesResult;
+    setuid(Constants::FOUNDATION_UID);
+    auto ret = bundleMgrProxy_->GetLaunchServices(bundleName, moduleName, userId, launchServicesResult);
+    setuid(Constants::ROOT_UID);
+    if (ret == ERR_OK) {
+        msg = "developerId: " + launchServicesResult.developerId +
+            ", appIdentifier: " + launchServicesResult.appIdentifier + "\n";
+        msg += "launchServices:\n{\n";
+        for (const auto &launchService : launchServicesResult.launchServices) {
+            msg += "     name: " + launchService.name +
+                ", binaryPath: " + launchService.binaryPath +
+                ", runAtLoad: " + std::to_string(launchService.runAtLoad) +
+                ", keepAlive: " + std::to_string(launchService.keepAlive) +
+                ", provideIpcService: " + std::to_string(launchService.provideIpcService) +
+                ", type: " + LaunchServiceTypeToString(launchService.type) + "\n";
         }
         msg += "}\n";
     }
