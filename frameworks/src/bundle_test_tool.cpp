@@ -278,6 +278,7 @@ static const std::string HELP_MSG =
     "  installEnterpriseResignCert      install an enterprise resign cert\n"
     "  uninstallEnterpriseReSignatureCert    uninstall enterprise re sign cert\n"
     "  getEnterpriseReSignatureCert          get enterprise re sign cert\n"
+    "  getEnterpriseReSignatureCertInfo     get enterprise re sign cert info\n"
     "  getApiTargetVersionByUid          get api target version by uid\n"
     "  getTopNLargestItemsInAppDataDir  get top N largest items in app data dir\n"
     "  parseSpmModule                   parse spm module\n"
@@ -1199,12 +1200,23 @@ const std::string HELP_MSG_GET_ENTERPRISE_RE_SIGN_CERT =
     "  -u, --user-id <user-id>                specify a user id\n"
     "  -p, --with-permission <with-permission> with permission\n";
 
+const std::string HELP_MSG_GET_ENTERPRISE_RE_SIGN_CERT_INFO =
+    "usage: bundle_test_tool getEnterpriseReSignatureCertInfo <options>\n"
+    "eg:bundle_test_tool getEnterpriseReSignatureCertInfo\n"
+    "options list:\n"
+    "  -h, --help                             list available commands\n"
+    "  -u, --user-id <user-id>                specify a user id\n"
+    "  -p, --with-permission <with-permission> with permission\n";
+
 
 const std::string STRING_UNINSTALL_ENTERPRISE_RE_SIGN_CERT_OK = "uninstallEnterpriseReSignCert successfully \n";
 const std::string STRING_UNINSTALL_ENTERPRISE_RE_SIGN_CERT_NG = "uninstallEnterpriseReSignCert failed \n";
 
 const std::string STRING_GET_ENTERPRISE_RE_SIGN_CERT_OK = "getEnterpriseReSignatureCert successfully \n";
 const std::string STRING_GET_ENTERPRISE_RE_SIGN_CERT_NG = "getEnterpriseReSignatureCert failed \n";
+
+const std::string STRING_GET_ENTERPRISE_RE_SIGN_CERT_INFO_OK = "getEnterpriseReSignatureCertInfo successfully \n";
+const std::string STRING_GET_ENTERPRISE_RE_SIGN_CERT_INFO_NG = "getEnterpriseReSignatureCertInfo failed \n";
 
 const std::string STRING_GET_ASSET_GROUPS_INFO_OK = "getAssetGroupsInfo successfully \n";
 const std::string STRING_GET_ASSET_GROUPS_INFO_NG = "error: failed to getAssetGroupsInfo \n";
@@ -1498,6 +1510,14 @@ const struct option LONG_OPTIONS_UNINSTALL_RE_SIGN_CERT[] = {
 
 const std::string SHORT_OPTIONS_GET_RE_SIGN_CERT = "hu:p:";
 const struct option LONG_OPTIONS_GET_RE_SIGN_CERT[] = {
+    {"help", no_argument, nullptr, 'h'},
+    {"user-id", required_argument, nullptr, 'u'},
+    {"with-permission", required_argument, nullptr, 'p'},
+    {nullptr, 0, nullptr, 0},
+};
+
+const std::string SHORT_OPTIONS_GET_RE_SIGN_CERT_INFO = "hu:p:";
+const struct option LONG_OPTIONS_GET_RE_SIGN_CERT_INFO[] = {
     {"help", no_argument, nullptr, 'h'},
     {"user-id", required_argument, nullptr, 'u'},
     {"with-permission", required_argument, nullptr, 'p'},
@@ -2379,6 +2399,7 @@ ErrCode BundleTestTool::CreateCommandMap()
         {"installEnterpriseResignCert", std::bind(&BundleTestTool::RunAsInstallEnterpriseResignCertCommand, this)},
         {"uninstallEnterpriseReSignatureCert", std::bind(&BundleTestTool::RunAsUninstallEnterpriseReSignCert, this)},
         {"getEnterpriseReSignatureCert", std::bind(&BundleTestTool::RunAsGetEnterpriseReSignCert, this)},
+        {"getEnterpriseReSignatureCertInfo", std::bind(&BundleTestTool::RunAsGetEnterpriseReSignCertInfo, this)},
         {"getOdidResetCount", std::bind(&BundleTestTool::RunAsGetOdidResetCount, this)},
         {"setBundleFirstLaunch", std::bind(&BundleTestTool::RunAsSetBundleFirstLaunch, this)},
         {"getTopNLargestItemsInAppDataDir", std::bind(&BundleTestTool::RunAsGetTopNLargestItemsInAppDataDir, this)},
@@ -3224,6 +3245,67 @@ ErrCode BundleTestTool::RunAsGetEnterpriseReSignCert()
         resultReceiver_.append(STRING_GET_ENTERPRISE_RE_SIGN_CERT_NG);
         resultReceiver_.append("ErrCode is " + std::to_string(results) + ".\n");
     }
+    return result;
+}
+
+ErrCode BundleTestTool::RunAsGetEnterpriseReSignCertInfo()
+{
+    APP_LOGI("GetEnterpriseReSignCertInfo begin");
+    int32_t userId = 0;
+    bool withPermission = false;
+    int result = ParseGetEnterpriseReSignCertInfoOptions(userId, withPermission);
+    std::vector<EnterpriseCertInfo> certInfos;
+    if (result != OHOS::ERR_OK) {
+        resultReceiver_.append(HELP_MSG_GET_ENTERPRISE_RE_SIGN_CERT_INFO);
+        return result;
+    }
+    APP_LOGI("GetEnterpriseReSignatureCertInfo -u:%{public}d", userId);
+    if (withPermission) {
+        ReloadNativeTokenInfo();
+    }
+    auto results = bundleInstallerProxy_->GetEnterpriseReSignatureCertInfo(userId, certInfos);
+    if (results == ERR_OK) {
+        resultReceiver_.append(STRING_GET_ENTERPRISE_RE_SIGN_CERT_INFO_OK);
+        for (const auto &certInfo : certInfos) {
+            resultReceiver_.append("certAlias:" + certInfo.certAlias +
+                ", enterpriseName:" + certInfo.enterpriseName +
+                ", notAfter:" + std::to_string(certInfo.notAfter) + "\n");
+        }
+        return result;
+    }
+    resultReceiver_.append(STRING_GET_ENTERPRISE_RE_SIGN_CERT_INFO_NG);
+    resultReceiver_.append("ErrCode is " + std::to_string(results) + ".\n");
+    return result;
+}
+
+ErrCode BundleTestTool::ParseGetEnterpriseReSignCertInfoOptions(int32_t &userId, bool &withPermission)
+{
+    int result = OHOS::ERR_OK;
+    int counter = 0;
+    std::string commandName = "getEnterpriseReSignCertInfo";
+    std::string name = "";
+    int32_t option = 0;
+    do {
+        counter++;
+        option = getopt_long(argc_, argv_, SHORT_OPTIONS_GET_RE_SIGN_CERT_INFO.c_str(),
+            LONG_OPTIONS_GET_RE_SIGN_CERT_INFO, nullptr);
+        APP_LOGD("option: %{public}d, optopt: %{public}d, optind: %{public}d", option, optopt, optind);
+        if (optind < 0 || optind > argc_) {
+            return OHOS::ERR_INVALID_VALUE;
+        }
+        if (option == -1) {
+            if ((counter == 1) && (strcmp(argv_[optind], cmd_.c_str()) == 0)) {
+                APP_LOGD("bundle_test_tool getStr with no option.");
+                return OHOS::ERR_INVALID_VALUE;
+            }
+        } else {
+            int temp = 0;
+            result = !CheckGetStringCorrectOption(option, commandName, temp, name)
+                ? OHOS::ERR_INVALID_VALUE : result;
+            userId = option == 'u' ? temp : userId;
+            withPermission = option == 'p' ? temp : withPermission;
+        }
+    } while (option != -1);
     return result;
 }
 
