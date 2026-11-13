@@ -73,6 +73,8 @@ private:
     bool ReloadInstallExistedTokenInfo(int32_t euid, const std::string &permissionMode);
     ErrCode RunAsUninstallEnterpriseReSignCert();
     ErrCode RunAsGetEnterpriseReSignCert();
+    ErrCode RunAsGetEnterpriseReSignCertInfo();
+    ErrCode ParseGetEnterpriseReSignCertInfoOptions(int32_t &userId, bool &withPermission);
     ErrCode RunAsGetStringCommand();
     ErrCode RunAsGetIconCommand();
     ErrCode RunAsDeleteDisposedRulesCommand();
