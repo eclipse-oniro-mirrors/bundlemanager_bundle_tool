@@ -925,7 +925,9 @@ const std::string HELP_MSG_LAUNCH_SERVICES =
     "  -h, --help                             list available commands\n"
     "  -n, --bundle-name <bundle-name>        specify a bundle name\n"
     "  -m, --module-name <module-name>        specify a module name\n"
-    "  -u, --user-id <user-id>                specify a user id\n";
+    "  -u, --user-id <user-id>                specify a user id\n"
+    "  -i, --uid <uid>                        set caller uid via setuid before calling\n"
+    "                                         (optional; if omitted, setuid to FOUNDATION_UID)\n";
 
 const std::string HELP_MSG_SET_APPLICATION_DISABLE_FORBIDDEN =
     "usage: bundle_test_tool setApplicationDisableForbidden <options>\n"
@@ -1885,12 +1887,13 @@ const struct option LONG_OPTIONS_GET_ALL_JSON_PROFILE[] = {
     {nullptr, 0, nullptr, 0},
 };
 
-const std::string SHORT_OPTIONS_GET_LAUNCH_SERVICES = "hn:m:u:";
+const std::string SHORT_OPTIONS_GET_LAUNCH_SERVICES = "hn:m:u:i:";
 const struct option LONG_OPTIONS_GET_LAUNCH_SERVICES[] = {
     {"help", no_argument, nullptr, 'h'},
     {"bundle-name", required_argument, nullptr, 'n'},
     {"module-name", required_argument, nullptr, 'm'},
     {"user-id", required_argument, nullptr, 'u'},
+    {"uid", required_argument, nullptr, 'i'},
     {nullptr, 0, nullptr, 0},
 };
 
@@ -8313,6 +8316,7 @@ ErrCode BundleTestTool::RunAsGetLaunchServices()
     std::string bundleName = "";
     std::string moduleName = "";
     int32_t userId = 100;
+    int32_t uid = Constants::FOUNDATION_UID;
     int32_t option = getopt_long(argc_, argv_, SHORT_OPTIONS_GET_LAUNCH_SERVICES.c_str(),
         LONG_OPTIONS_GET_LAUNCH_SERVICES, nullptr);
     if (optind < 0 || optind > argc_) {
@@ -8334,6 +8338,7 @@ ErrCode BundleTestTool::RunAsGetLaunchServices()
         bundleName = option == 'n' ? name : bundleName;
         moduleName = option == 'm' ? name : moduleName;
         userId = option == 'u' ? temp : userId;
+        uid = option == 'i' ? temp : uid;
         option = getopt_long(argc_, argv_, SHORT_OPTIONS_GET_LAUNCH_SERVICES.c_str(),
             LONG_OPTIONS_GET_LAUNCH_SERVICES, nullptr);
         if (optind < 0 || optind > argc_) {
@@ -8344,7 +8349,7 @@ ErrCode BundleTestTool::RunAsGetLaunchServices()
         resultReceiver_.append(HELP_MSG_LAUNCH_SERVICES);
     } else {
         std::string msg;
-        result = GetLaunchServices(bundleName, moduleName, userId, msg);
+        result = GetLaunchServices(bundleName, moduleName, userId, uid, msg);
         if (result == ERR_OK) {
             resultReceiver_.append(STRING_GET_LAUNCH_SERVICES_OK + msg);
         } else {
@@ -8356,14 +8361,14 @@ ErrCode BundleTestTool::RunAsGetLaunchServices()
 }
 
 ErrCode BundleTestTool::GetLaunchServices(const std::string &bundleName, const std::string &moduleName,
-    int32_t userId, std::string& msg)
+    int32_t userId, int32_t uid, std::string& msg)
 {
     if (bundleMgrProxy_ == nullptr) {
         APP_LOGE("bundleMgrProxy_ is nullptr");
         return ERR_APPEXECFWK_NULL_PTR;
     }
     LaunchServicesResult launchServicesResult;
-    setuid(Constants::FOUNDATION_UID);
+    setuid(uid);
     auto ret = bundleMgrProxy_->GetLaunchServices(bundleName, moduleName, userId, launchServicesResult);
     setuid(Constants::ROOT_UID);
     if (ret == ERR_OK) {
