@@ -155,6 +155,11 @@ private:
     int32_t ValidateBatchSetApplicationEnabledParams(int32_t enableAppIndex, int32_t disableAppIndex);
     ErrCode ExecuteBatchSetApplicationEnabled(int32_t userId, int32_t enableAppIndex, int32_t disableAppIndex,
         bool killProcess, bool needSendEvent, int32_t uid);
+    ErrCode RunAsRecoverDisposedRule();
+    bool ParseRecoverDisposedRuleOptions(int32_t &userId, bool &isSystemApp, bool &withPermission);
+    ErrCode SetRecoverDisposedRuleCaller(int32_t userId, bool isSystemApp, bool withPermission, uint32_t &hapTokenId);
+    ErrCode ExecuteRecoverDisposedRule(int32_t userId);
+    ErrCode ReportRecoverDisposedRuleFailure(ErrCode code);
     ErrCode RunAsGetDisposedRules();
     ErrCode GetDisposedRules(int32_t userId, std::string &msg);
     ErrCode CheckGetDisposedRulesCorrectOption(
@@ -344,7 +349,7 @@ private:
         std::string &policies);
     bool ProcessDeviceModeDistributionPolicyEnums(std::vector<std::string> policyStrings,
         std::set<DeviceModeDistributionPolicy> &policyEnums);
-    void ReloadNativeTokenInfo();
+    void ReloadNativeTokenInfo(bool manageHapToken = false);
     ErrCode InnerGetSimpleAppInfoForUid(const int32_t &option, std::vector<std::int32_t> &uids);
     ErrCode UninstallPreInstallBundleOperation(
         const std::string &bundleName, InstallParam &installParam) const;
