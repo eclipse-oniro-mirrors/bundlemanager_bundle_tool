@@ -48,6 +48,7 @@
 #include "data_group_info.h"
 #include "ipc_group_info.h"
 #include "directory_ex.h"
+#include "disposed_rule.h"
 #include "get_largest_items_callback_host.h"
 #include "module_info.h"
 #include "parameter.h"
@@ -125,6 +126,8 @@ constexpr size_t BUNDLE_STATS_MIN_SIZE = 5;
 constexpr const char* IS_ENTERPRISE_DEVICE = "const.edm.is_enterprise_device";
 // test param
 constexpr const char* ENABLE_DEBUG_MODE_PARMA = "param.bms.test.enable_debug_mode";
+constexpr const char* RECOVER_DISPOSED_RULE_PERMISSION = "ohos.permission.MANAGE_DISPOSED_APP_STATUS";
+constexpr const char* GET_DISPOSED_RULE_PERMISSION = "ohos.permission.GET_DISPOSED_APP_STATUS";
 // quick fix error message
 const std::string MSG_ERR_BUNDLEMANAGER_QUICK_FIX_INTERNAL_ERROR = "error: quick fix internal error.\n";
 const std::string MSG_ERR_BUNDLEMANAGER_QUICK_FIX_PARAM_ERROR = "error: param error.\n";
@@ -281,6 +284,9 @@ static const std::string HELP_MSG =
     "  getBundleNameByAppId             get bundlename by appid or appIdentifier\n"
     "  getAssetAccessGroups             get asset access groups by bundlename\n"
     "  getDisposedRules                 get disposed rules\n"
+    "  setRecoverDisposedRule           set the default recover rule [options]\n"
+    "  getRecoverDisposedRule           get the caller's recover rule [options]\n"
+    "  deleteRecoverDisposedRule        delete the caller's recover rule [options]\n"
     "  getAppIdentifierAndAppIndex      get appIdentifier and appIndex\n"
     "  getAssetGroupsInfo               get asset groups info by uid\n"
     "  setAppDistributionTypes          set white list of appDistributionType\n"
@@ -1011,6 +1017,15 @@ const std::string HELP_MSG_SET_DEFAULT_APPLICATION_FOR_CUSTOM =
     "  -a, --ability-name <ability-name>      specify ability name of the application\n" 
     "  -c, --caller-uid <caller-uid>          specify a caller uid\n";
 
+const std::string HELP_MSG_RECOVER_DISPOSED_RULE_OPTIONS =
+    "options list:\n"
+    "  -h, --help                             list available commands\n"
+    "  -u, --user-id <user-id>                 specify a user id\n"
+    "                                         (optional; defaults to the current foreground user)\n"
+    "  -s, --system-app <0|1>                  system API identity (default: 1)\n"
+    "                                         1: native/system HAP caller; 0: non-system HAP caller\n"
+    "  -p, --with-permission <0|1>             grant disposed status permission (default: 1)\n";
+
 const std::string HELP_MSG_GET_DISPOSED_RULES =
     "usage: bundle_test_tool getDisposedRules <options>\n"
     "eg:bundle_test_tool getDisposedRules -u <user-id>\n"
@@ -1400,6 +1415,10 @@ const std::string STRING_BATCH_SET_APPLICATION_ENABLED_NG = "batchSetApplication
 
 const std::string STRING_SET_DEFAULT_APPLICATION_FOR_CUSTOM_OK = "setDefaultApplicationForCustom successfully\n";
 const std::string STRING_SET_DEFAULT_APPLICATION_FOR_CUSTOM_NG = "setDefaultApplicationForCustom failed\n";
+
+const std::string STRING_SET_RECOVER_DISPOSED_RULE_OK = "setRecoverDisposedRule successfully\n";
+const std::string STRING_GET_RECOVER_DISPOSED_RULE_OK = "getRecoverDisposedRule successfully\n";
+const std::string STRING_DELETE_RECOVER_DISPOSED_RULE_OK = "deleteRecoverDisposedRule successfully\n";
 
 const std::string STRING_GET_DISPOSED_RULES_OK = "getDisposedRules successfully\n";
 const std::string STRING_GET_DISPOSED_RULES_NG = "getDisposedRules failed\n";
@@ -2009,6 +2028,15 @@ const struct option LONG_OPTIONS_SET_DEFAULT_APPLICATION_FOR_CUSTOM[] = {
     {nullptr, 0, nullptr, 0},
 };
 
+const std::string SHORT_OPTIONS_RECOVER_DISPOSED_RULE = "hu:s:p:";
+const struct option LONG_OPTIONS_RECOVER_DISPOSED_RULE[] = {
+    {"help", no_argument, nullptr, 'h'},
+    {"user-id", required_argument, nullptr, 'u'},
+    {"system-app", required_argument, nullptr, 's'},
+    {"with-permission", required_argument, nullptr, 'p'},
+    {nullptr, 0, nullptr, 0},
+};
+
 const std::string SHORT_OPTIONS_GET_DISPOSED_RULES = "hu:c:";
 const struct option LONG_OPTIONS_GET_DISPOSED_RULES[] = {
     {"help", no_argument, nullptr, 'h'},
@@ -2452,6 +2480,12 @@ ErrCode BundleTestTool::CreateCommandMap()
             std::bind(&BundleTestTool::RunAsSetDefaultApplicationForCustom, this)},
         {"getDisposedRules",
             std::bind(&BundleTestTool::RunAsGetDisposedRules, this)},
+        {"setRecoverDisposedRule",
+            std::bind(&BundleTestTool::RunAsRecoverDisposedRule, this)},
+        {"getRecoverDisposedRule",
+            std::bind(&BundleTestTool::RunAsRecoverDisposedRule, this)},
+        {"deleteRecoverDisposedRule",
+            std::bind(&BundleTestTool::RunAsRecoverDisposedRule, this)},
         {"getAllBundleCacheStat",
             std::bind(&BundleTestTool::RunAsGetAllBundleCacheStat, this)},
         {"getEachBundleCacheStat",
@@ -7047,9 +7081,9 @@ bool BundleTestTool::ProcessAppDistributionTypeEnums(std::vector<std::string> ap
     return true;
 }
 
-void BundleTestTool::ReloadNativeTokenInfo()
+void BundleTestTool::ReloadNativeTokenInfo(bool manageHapToken)
 {
-    const int32_t permsNum = 8;
+    const int32_t permsNum = 9;
     uint64_t tokenId;
     const char *perms[permsNum];
     perms[0] = "ohos.permission.MANAGE_EDM_POLICY";
@@ -7060,9 +7094,10 @@ void BundleTestTool::ReloadNativeTokenInfo()
     perms[5] = "ohos.permission.GET_BUNDLE_RESOURCES";
     perms[6] = "ohos.permission.REMOVE_CACHE_FILES";
     perms[7] = "ohos.permission.CHANGE_ABILITY_ENABLED_STATE";
+    perms[8] = "ohos.permission.MANAGE_HAP_TOKENID";
     NativeTokenInfoParams infoInstance = {
         .dcapsNum = 0,
-        .permsNum = permsNum,
+        .permsNum = manageHapToken ? permsNum : permsNum - 1,
         .aclsNum = 0,
         .dcaps = NULL,
         .perms = perms,
@@ -9056,6 +9091,172 @@ ErrCode BundleTestTool::BatchSetApplicationEnabled(int32_t userId, int32_t enabl
     }
     return bundleMgrProxy_->BatchSetApplicationEnabled(userId, enableAppIndex, disableAppIndex, killProcess,
         needSendEvent);
+}
+
+bool BundleTestTool::ParseRecoverDisposedRuleOptions(int32_t &userId, bool &isSystemApp, bool &withPermission)
+{
+    std::set<int32_t> seenOptions;
+    optind = 0;
+    int32_t option;
+    while ((option = getopt_long(argc_ - 1, argv_ + 1, SHORT_OPTIONS_RECOVER_DISPOSED_RULE.c_str(),
+        LONG_OPTIONS_RECOVER_DISPOSED_RULE, nullptr)) != -1) {
+        int32_t value = 0;
+        if (!seenOptions.insert(option).second || optarg == nullptr || !OHOS::StrToInt(optarg, value)) {
+            return false;
+        }
+        if (option == 'u') {
+            if (value < 0) {
+                return false;
+            }
+            userId = value;
+        } else if ((option == 's' || option == 'p') && (value == 0 || value == 1)) {
+            if (option == 's') {
+                isSystemApp = value == 1;
+            } else {
+                withPermission = value == 1;
+            }
+        } else {
+            return false;
+        }
+    }
+    if (optind != argc_ - 1) {
+        return false;
+    }
+    userId = BundleCommandCommon::GetCurrentUserId(userId);
+    return userId >= 0;
+}
+
+ErrCode BundleTestTool::SetRecoverDisposedRuleCaller(int32_t userId, bool isSystemApp, bool withPermission,
+    uint32_t &hapTokenId)
+{
+    using namespace OHOS::Security::AccessToken;
+    if (AccessTokenKit::GetTokenTypeFlag(static_cast<AccessTokenID>(GetSelfTokenID())) != TOKEN_NATIVE) {
+        APP_LOGE("prepare recover rule native token failed");
+        return ERR_APPEXECFWK_SERVICE_INTERNAL_ERROR;
+    }
+    // Use a temporary HAP token to control system app status and disposed rule permissions.
+    if (!isSystemApp || !withPermission) {
+        HapInfoParams info = {};
+        info.userID = userId;
+        info.bundleName = "com.example.bundletool.recoverrule.p" + std::to_string(getpid());
+        info.appIDDesc = "bundle_tool_recover_rule";
+        info.isSystemApp = isSystemApp;
+        HapPolicyParams policy = {};
+        policy.apl = APL_SYSTEM_CORE;
+        policy.domain = "test_domain";
+        if (withPermission) {
+            PermissionStateFull permission = {};
+            permission.permissionName = RECOVER_DISPOSED_RULE_PERMISSION;
+            permission.isGeneral = true;
+            permission.resDeviceID = {"local"};
+            permission.grantStatus = {PERMISSION_GRANTED};
+            permission.grantFlags = {PERMISSION_SYSTEM_FIXED};
+            policy.permStateList.emplace_back(permission);
+        }
+        auto token = AccessTokenKit::AllocHapToken(info, policy);
+        hapTokenId = token.tokenIdExStruct.tokenID;
+        if (hapTokenId == 0 || SetSelfTokenID(token.tokenIDEx) != 0) {
+            APP_LOGE("prepare recover rule HAP token failed");
+            return ERR_APPEXECFWK_SERVICE_INTERNAL_ERROR;
+        }
+    }
+    auto tokenId = static_cast<AccessTokenID>(GetSelfTokenID());
+    bool hasManagePermission = AccessTokenKit::VerifyAccessToken(tokenId,
+        RECOVER_DISPOSED_RULE_PERMISSION) == PERMISSION_GRANTED;
+    bool hasGetPermission = AccessTokenKit::VerifyAccessToken(tokenId,
+        GET_DISPOSED_RULE_PERMISSION) == PERMISSION_GRANTED;
+    if (hasManagePermission != withPermission || (!withPermission && hasGetPermission)) {
+        APP_LOGE("unexpected recover rule token permissions");
+        return ERR_APPEXECFWK_SERVICE_INTERNAL_ERROR;
+    }
+    return ERR_OK;
+}
+
+ErrCode BundleTestTool::ReportRecoverDisposedRuleFailure(ErrCode code)
+{
+    resultReceiver_.append(cmd_ + " failed, errCode=" + std::to_string(code) + "\n");
+    return code;
+}
+
+ErrCode BundleTestTool::RunAsRecoverDisposedRule()
+{
+    const std::string usage = "usage: bundle_test_tool " + cmd_ + " [options]\n" +
+        "eg:bundle_test_tool " + cmd_ + "\n" + HELP_MSG_RECOVER_DISPOSED_RULE_OPTIONS;
+    if (argc_ == INDEX_OFFSET + 1 &&
+        (std::string(argv_[INDEX_OFFSET]) == "-h" || std::string(argv_[INDEX_OFFSET]) == "--help")) {
+        resultReceiver_.append(usage);
+        return ERR_OK;
+    }
+    int32_t userId = Constants::UNSPECIFIED_USERID;
+    bool isSystemApp = true;
+    bool withPermission = true;
+    if (!ParseRecoverDisposedRuleOptions(userId, isSystemApp, withPermission)) {
+        return ReportRecoverDisposedRuleFailure(ERR_INVALID_VALUE);
+    }
+    uint64_t originalTokenId = GetSelfTokenID();
+    bool needHapToken = !isSystemApp || !withPermission;
+    ReloadNativeTokenInfo(needHapToken);
+    uint64_t nativeTokenId = GetSelfTokenID();
+    uint32_t hapTokenId = 0;
+    ErrCode ret = SetRecoverDisposedRuleCaller(userId, isSystemApp, withPermission, hapTokenId);
+    if (ret == ERR_OK) {
+        ret = ExecuteRecoverDisposedRule(userId);
+    } else {
+        ReportRecoverDisposedRuleFailure(ret);
+    }
+    if (hapTokenId != 0) {
+        if (SetSelfTokenID(nativeTokenId) != 0) {
+            APP_LOGE("restore native token for HAP token cleanup failed");
+        } else {
+            int32_t deleteRet = OHOS::Security::AccessToken::AccessTokenKit::DeleteToken(hapTokenId);
+            if (deleteRet != ERR_OK) {
+                APP_LOGE("delete recover rule temporary HAP token failed, errCode: %{public}d", deleteRet);
+            }
+        }
+    }
+    if (needHapToken) {
+        ReloadNativeTokenInfo();
+    }
+    if (SetSelfTokenID(originalTokenId) != 0) {
+        APP_LOGE("restore recover rule caller token failed");
+    }
+    return ret;
+}
+
+ErrCode BundleTestTool::ExecuteRecoverDisposedRule(int32_t userId)
+{
+    if (bundleMgrProxy_ == nullptr) {
+        return ReportRecoverDisposedRuleFailure(ERR_APPEXECFWK_NULL_PTR);
+    }
+    auto appControlProxy = bundleMgrProxy_->GetAppControlProxy();
+    if (appControlProxy == nullptr) {
+        return ReportRecoverDisposedRuleFailure(ERR_APPEXECFWK_NULL_PTR);
+    }
+    RecoverDisposedRule rule;
+    ErrCode ret = OHOS::ERR_OK;
+    std::string successMessage;
+    if (cmd_ == "setRecoverDisposedRule") {
+        rule.want = std::make_shared<AAFwk::Want>();
+        rule.want->SetElementName("", "com.example.recoverdisposedrule", "RecoverServiceExtension", "entry");
+        rule.priority = 0;
+        rule.recoverComponentType = RecoverComponentType::EXTENSION;
+        ret = appControlProxy->SetRecoverDisposedRule(rule, userId);
+        successMessage = STRING_SET_RECOVER_DISPOSED_RULE_OK;
+    } else if (cmd_ == "getRecoverDisposedRule") {
+        ret = appControlProxy->GetRecoverDisposedRule(userId, rule);
+        successMessage = STRING_GET_RECOVER_DISPOSED_RULE_OK;
+    } else {
+        ret = appControlProxy->DeleteRecoverDisposedRule(userId);
+        successMessage = STRING_DELETE_RECOVER_DISPOSED_RULE_OK;
+    }
+    if (ret != ERR_OK) {
+        return ReportRecoverDisposedRuleFailure(ret);
+    }
+    resultReceiver_.append(successMessage);
+    if (cmd_ != "deleteRecoverDisposedRule") {
+        resultReceiver_.append("rule=" + rule.ToString() + "\n");
+    }
+    return ret;
 }
 
 ErrCode BundleTestTool::RunAsGetDisposedRules()
