@@ -177,6 +177,7 @@ private:
     ErrCode RunAsGetSimpleAppInfoForUid();
     ErrCode RunAsGetBundleNameByAppId();
     ErrCode RunAsGetAssetAccessGroups();
+    ErrCode RunAsCheckBundleExistByDeveloperIdAndAssetGroup();
     ErrCode RunAsSetAppDistributionTypes();
     ErrCode RunAsGetBundleNamesForUidExtCommand();
     ErrCode RunAsGetAppIdentifierAndAppIndex();

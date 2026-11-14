@@ -283,6 +283,7 @@ static const std::string HELP_MSG =
     "  getSimpleAppInfoForUid           get bundlename list and appIndex list by uid list\n"
     "  getBundleNameByAppId             get bundlename by appid or appIdentifier\n"
     "  getAssetAccessGroups             get asset access groups by bundlename\n"
+    "  checkBundleExistByDeveloperIdAndAssetGroup  check whether a matching bundle exists\n"
     "  getDisposedRules                 get disposed rules\n"
     "  setRecoverDisposedRule           set the default recover rule [options]\n"
     "  getRecoverDisposedRule           get the caller's recover rule [options]\n"
@@ -1213,6 +1214,16 @@ const std::string HELP_MSG_GET_ASSET_ACCESS_GROUPS =
     "  -h, --help                             list available commands\n"
     "  -n, --bundle-name <bundle-name>        specify bundle name of the application\n";
 
+const std::string HELP_MSG_CHECK_BUNDLE_EXIST_BY_DEVELOPER_ID_AND_ASSET_GROUP =
+    "usage: bundle_test_tool checkBundleExistByDeveloperIdAndAssetGroup <options>\n"
+    "eg:bundle_test_tool checkBundleExistByDeveloperIdAndAssetGroup -d <developer-id> "
+    "-a <asset-access-group> -u <user-id>\n"
+    "options list:\n"
+    "  -h, --help                             list available commands\n"
+    "  -d, --developer-id <developer-id>      specify developer id\n"
+    "  -a, --asset-access-group <group>       specify asset access group\n"
+    "  -u, --user-id <user-id>                specify user id\n";
+
 const std::string HELP_MSG_GET_APPIDENTIFIER_AND_APPINDEX =
     "usage: bundle_test_tool getAppIdentifierAndAppIndex <options>\n"
     "eg:bundle_test_tool getAppIdentifierAndAppIndex -a <access-token-id>\n"
@@ -1488,6 +1499,11 @@ const std::string STRING_UNINSTALL_PREINSTALL_BUNDLE_FAILED = "uninstall preinst
 
 const std::string STRING_GET_ASSET_ACCESS_GROUPS_OK = "getAssetAccessGroups successfully\n";
 const std::string STRING_GET_ASSET_ACCESS_GROUPS_NG = "getAssetAccessGroups failed\n";
+
+const std::string STRING_CHECK_BUNDLE_EXIST_BY_DEVELOPER_ID_AND_ASSET_GROUP_OK =
+    "checkBundleExistByDeveloperIdAndAssetGroup successfully\n";
+const std::string STRING_CHECK_BUNDLE_EXIST_BY_DEVELOPER_ID_AND_ASSET_GROUP_NG =
+    "checkBundleExistByDeveloperIdAndAssetGroup failed\n";
 
 const std::string STRING_GET_APPIDENTIFIER_AND_APPINDEX_OK = "getAppIdentifierAndAppIndex successfully\n";
 const std::string STRING_GET_APPIDENTIFIER_AND_APPINDEX_NG = "getAppIdentifierAndAppIndex failed\n";
@@ -2154,6 +2170,15 @@ const struct option LONG_OPTIONS_GET_ASSET_ACCESS_GROUPS[] = {
     {nullptr, 0, nullptr, 0},
 };
 
+const std::string SHORT_OPTIONS_CHECK_BUNDLE_EXIST_BY_DEVELOPER_ID_AND_ASSET_GROUP = "hd:a:u:";
+const struct option LONG_OPTIONS_CHECK_BUNDLE_EXIST_BY_DEVELOPER_ID_AND_ASSET_GROUP[] = {
+    {"help", no_argument, nullptr, 'h'},
+    {"developer-id", required_argument, nullptr, 'd'},
+    {"asset-access-group", required_argument, nullptr, 'a'},
+    {"user-id", required_argument, nullptr, 'u'},
+    {nullptr, 0, nullptr, 0},
+};
+
 const std::string SHORT_OPTIONS_SET_APP_DISTRIBUTION_TYPES = "ha:";
 const struct option LONG_OPTIONS_SET_APP_DISTRIBUTION_TYPES[] = {
     {"help", no_argument, nullptr, 'h'},
@@ -2510,6 +2535,8 @@ ErrCode BundleTestTool::CreateCommandMap()
         {"uninstallPreInstallBundle", std::bind(&BundleTestTool::RunAsUninstallPreInstallBundleCommand, this)},
         {"getAssetAccessGroups",
             std::bind(&BundleTestTool::RunAsGetAssetAccessGroups, this)},
+        {"checkBundleExistByDeveloperIdAndAssetGroup",
+            std::bind(&BundleTestTool::RunAsCheckBundleExistByDeveloperIdAndAssetGroup, this)},
         {"getAppIdentifierAndAppIndex",
             std::bind(&BundleTestTool::RunAsGetAppIdentifierAndAppIndex, this)},
         {"setAppDistributionTypes",
@@ -7011,6 +7038,61 @@ ErrCode BundleTestTool::RunAsGetAssetAccessGroups()
                 resultReceiver_.append("\n");
             }
         }
+    }
+    return result;
+}
+
+ErrCode BundleTestTool::RunAsCheckBundleExistByDeveloperIdAndAssetGroup()
+{
+    std::string commandName = "checkBundleExistByDeveloperIdAndAssetGroup";
+    std::string developerId;
+    std::string assetAccessGroup;
+    int32_t userId = Constants::UNSPECIFIED_USERID;
+    bool userIdSpecified = false;
+    bool parseResult = true;
+    int32_t option = 0;
+    while ((option = getopt_long(argc_, argv_,
+        SHORT_OPTIONS_CHECK_BUNDLE_EXIST_BY_DEVELOPER_ID_AND_ASSET_GROUP.c_str(),
+        LONG_OPTIONS_CHECK_BUNDLE_EXIST_BY_DEVELOPER_ID_AND_ASSET_GROUP, nullptr)) != -1) {
+        switch (option) {
+            case 'h':
+                resultReceiver_.append(HELP_MSG_CHECK_BUNDLE_EXIST_BY_DEVELOPER_ID_AND_ASSET_GROUP);
+                return OHOS::ERR_OK;
+            case 'd':
+                developerId = optarg;
+                break;
+            case 'a':
+                assetAccessGroup = optarg;
+                break;
+            case 'u': {
+                int parsedUserId = 0;
+                StringToInt(optarg, commandName, parsedUserId, parseResult);
+                if (parseResult) {
+                    userId = parsedUserId;
+                    userIdSpecified = true;
+                }
+                break;
+            }
+            default:
+                resultReceiver_.append(HELP_MSG_CHECK_BUNDLE_EXIST_BY_DEVELOPER_ID_AND_ASSET_GROUP);
+                return OHOS::ERR_INVALID_VALUE;
+        }
+    }
+    if (!parseResult || !userIdSpecified) {
+        resultReceiver_.append(HELP_MSG_CHECK_BUNDLE_EXIST_BY_DEVELOPER_ID_AND_ASSET_GROUP);
+        return OHOS::ERR_INVALID_VALUE;
+    }
+
+    bool isExist = false;
+    ErrCode result = bundleMgrProxy_->CheckBundleExistByDeveloperIdAndAssetGroup(developerId,
+        assetAccessGroup, userId, isExist);
+    if (result == OHOS::ERR_OK) {
+        resultReceiver_.append(STRING_CHECK_BUNDLE_EXIST_BY_DEVELOPER_ID_AND_ASSET_GROUP_OK);
+        resultReceiver_.append("isExist: ");
+        resultReceiver_.append(isExist ? "true\n" : "false\n");
+    } else {
+        resultReceiver_.append(STRING_CHECK_BUNDLE_EXIST_BY_DEVELOPER_ID_AND_ASSET_GROUP_NG);
+        resultReceiver_.append("error: " + std::to_string(result) + "\n");
     }
     return result;
 }
