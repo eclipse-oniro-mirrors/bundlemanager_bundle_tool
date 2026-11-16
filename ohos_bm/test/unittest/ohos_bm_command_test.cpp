@@ -2629,6 +2629,56 @@ HWTEST_F(OhosBmCommandTest, JsonResult_0800, TestSize.Level0)
     EXPECT_NE(result.find("install param error"), std::string::npos);
 }
 
+/**
+ * @tc.name: JsonResult_0900
+ * @tc.desc: Test CreateErrorResult with converged dedup so error code that has messageMap entry.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, JsonResult_0900, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("help"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    // Need to init messageMap
+    cmd.CreateMessageMap();
+    std::string result = cmd.CreateErrorResult(
+        IStatusReceiver::ERR_INSTALL_DEDUP_SO_LINK_FAILED, "test");
+    EXPECT_NE(result.find("\"status\":\"failed\""), std::string::npos);
+    // Should contain the code name from errorCodeMap
+    EXPECT_NE(result.find("ERR_INSTALL_DEDUP_SO_LINK_FAILED"), std::string::npos);
+    // Should contain the code message from messageMap
+    EXPECT_NE(result.find("dedup so link failed"), std::string::npos);
+}
+
+/**
+ * @tc.name: JsonResult_1000
+ * @tc.desc: Test CreateErrorResult with reserved dedup so error code that has no messageMap entry.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, JsonResult_1000, TestSize.Level0)
+{
+    char *argv[] = {
+        const_cast<char *>("ohos-bm"),
+        const_cast<char *>("help"),
+    };
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    BundleManagerShellCommand cmd(argc, argv);
+    SetMockObjects(cmd);
+    // Need to init messageMap
+    cmd.CreateMessageMap();
+    std::string result = cmd.CreateErrorResult(
+        IStatusReceiver::ERR_INSTALL_DEDUP_SO_CONFIG_UNAVAILABLE, "test");
+    EXPECT_NE(result.find("\"status\":\"failed\""), std::string::npos);
+    // Unmapped reserved code falls back to the unknown-code name
+    EXPECT_NE(result.find("ERR_UNKNOWN_9568461"), std::string::npos);
+    // Should not contain any dedup so message
+    EXPECT_EQ(result.find("dedup so"), std::string::npos);
+}
+
 // ========== SetDisposedRule Extended Tests ==========
 
 /**
@@ -2847,6 +2897,20 @@ HWTEST_F(OhosBmCommandTest, BundleMessageMap_0100, TestSize.Level0)
     EXPECT_NE(msgMap.find(IStatusReceiver::ERR_INSTALL_PARAM_ERROR), msgMap.end());
     EXPECT_NE(msgMap.find(IStatusReceiver::ERR_UNINSTALL_INVALID_NAME), msgMap.end());
     EXPECT_NE(msgMap.find(IStatusReceiver::ERR_UNKNOWN), msgMap.end());
+}
+
+/**
+ * @tc.name: BundleMessageMap_0200
+ * @tc.desc: Test bundleMessageMap_ contains only the converged dedup so error code entry.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OhosBmCommandTest, BundleMessageMap_0200, TestSize.Level0)
+{
+    auto &msgMap = BundleCommandCommon::bundleMessageMap_;
+    EXPECT_NE(msgMap.find(IStatusReceiver::ERR_INSTALL_DEDUP_SO_LINK_FAILED), msgMap.end());
+    EXPECT_EQ(msgMap.find(IStatusReceiver::ERR_INSTALL_DEDUP_SO_CONFIG_UNAVAILABLE), msgMap.end());
+    EXPECT_EQ(msgMap.find(IStatusReceiver::ERR_INSTALL_DEDUP_SO_NO_MATCH), msgMap.end());
+    EXPECT_EQ(msgMap.find(IStatusReceiver::ERR_INSTALL_DEDUP_SO_VERSION_MISMATCH), msgMap.end());
 }
 
 /**
