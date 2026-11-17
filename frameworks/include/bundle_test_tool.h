@@ -64,6 +64,7 @@ private:
     ErrCode RunAsGetRemovableCommand();
     ErrCode RunAsInstallSandboxCommand();
     ErrCode RunAsUninstallSandboxCommand();
+    ErrCode RunAsInstallExistedBundleByBundleNameCommand();
     ErrCode RunAsUninstallPreInstallBundleCommand();
     ErrCode RunAsDumpSandboxCommand();
     ErrCode RunAsInstallCommand();
@@ -289,6 +290,15 @@ private:
         const std::string &bundleName, const int32_t userId, const int32_t dlpType, int32_t &appIndex) const;
     ErrCode UninstallSandboxOperation(
         const std::string &bundleName, const int32_t appIndex, const int32_t userId) const;
+    ErrCode InstallExistedBundleByBundleNameOperation(
+        const std::string &bundleName, const int32_t userId) const;
+    ErrCode HandleInstallExistedBundleByBundleNameOption(int32_t option, std::string &bundleName, int32_t &userId,
+        bool &userIdSpecified, bool &reloadToken, std::vector<const char*> &extraPerms,
+        std::string &extraPermsMode, bool &helpShown);
+    ErrCode ParseInstallExistedBundleByBundleNameArgs(std::string &bundleName, int32_t &userId, bool &userIdSpecified,
+        bool &reloadToken, std::vector<const char*> &extraPerms, std::string &extraPermsMode);
+    void AppendInstallExistedBundleByBundleNameResult(ErrCode ret, bool reloadToken,
+        const std::string &extraPermsMode);
     ErrCode DumpSandboxBundleInfo(const std::string &bundleName, const int32_t appIndex, const int32_t userId,
         std::string &dumpResults);
     ErrCode StringToInt(std::string option, const std::string &commandName, int &temp, bool &result);
@@ -351,6 +361,7 @@ private:
     bool ProcessDeviceModeDistributionPolicyEnums(std::vector<std::string> policyStrings,
         std::set<DeviceModeDistributionPolicy> &policyEnums);
     void ReloadNativeTokenInfo(bool manageHapToken = false);
+    void ReloadNativeTokenInfo(const std::vector<const char*> &extraPerms, bool manageHapToken = false);
     ErrCode InnerGetSimpleAppInfoForUid(const int32_t &option, std::vector<std::int32_t> &uids);
     ErrCode UninstallPreInstallBundleOperation(
         const std::string &bundleName, InstallParam &installParam) const;

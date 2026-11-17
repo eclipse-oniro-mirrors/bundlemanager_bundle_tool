@@ -28,7 +28,9 @@
 #include <sys/ioctl.h>
 #include <thread>
 #include <unistd.h>
+#include <utility>
 #include <vector>
+#include <map>
 
 #include "accesstoken_kit.h"
 #include "app_log_wrapper.h"
@@ -202,6 +204,7 @@ static const std::string HELP_MSG =
     "  installSandbox                   indicates install sandbox\n"
     "  installExisted                   install an existing application for a specified user\n"
     "  uninstallSandbox                 indicates uninstall sandbox\n"
+    "  installExistedBundleByBundleName indicates reinstall an installed app by bundle name\n"
     "  uninstallPreInstallBundle        indicates uninstall preinstall bundle\n"
     "  dumpSandbox                      indicates dump sandbox info\n"
     "  getStr                           obtain the value of label by given bundle name, module name and label id\n"
@@ -345,6 +348,20 @@ const std::string HELP_MSG_UNINSTALL_SANDBOX =
     "  -u, --user-id <user-id>                specify a user id\n"
     "  -a, --app-index <app-index>            specify a app index\n"
     "  -n, --bundle-name <bundle-name>        install a sandbox of a bundle\n";
+
+const std::string HELP_MSG_INSTALL_EXISTED_BUNDLE_BY_BUNDLE_NAME =
+    "usage: bundle_test_tool installExistedBundleByBundleName <options>\n"
+    "options list:\n"
+    "  -h, --help                             list available commands\n"
+    "  -n, --bundle-name <bundle-name>        bundle name of the installed application\n"
+    "  -u, --user-id <user-id>                target user id\n"
+    "  -r, --reload-token <true|false>        reload native token info before calling (default: true)\n"
+    "  -p, --extra-perms <all|install|cross|none>\n"
+    "                                         extra permissions when reloading token (default: all)\n"
+    "                                         all: INSTALL_EXISTED_BUNDLE + INTERACT_ACROSS_LOCAL_ACCOUNTS\n"
+    "                                         install: INSTALL_EXISTED_BUNDLE only\n"
+    "                                         cross: INTERACT_ACROSS_LOCAL_ACCOUNTS only\n"
+    "                                         none: base permissions only\n";
 
 const std::string HELP_MSG_DUMP_SANDBOX =
     "usage: bundle_test_tool dumpSandbox <options>\n"
@@ -1328,6 +1345,15 @@ const std::string STRING_UNINSTALL_SANDBOX_SUCCESSFULLY = "uninstall sandbox app
 const std::string STRING_UNINSTALL_SANDBOX_FAILED = "uninstall sandbox app failed\n";
 
 const std::string STRING_DUMP_SANDBOX_FAILED = "dump sandbox app info failed\n";
+const std::string STRING_INSTALL_EXISTED_BUNDLE_BY_BUNDLE_NAME_SUCCESSFULLY =
+    "install existed bundle by bundle name successfully\n";
+const std::string STRING_INSTALL_EXISTED_BUNDLE_BY_BUNDLE_NAME_FAILED =
+    "install existed bundle by bundle name failed\n";
+const std::string STRING_INSTALL_EXISTED_BUNDLE_BY_BUNDLE_NAME_PERMISSION_DENIED =
+    "error: install existed bundle by bundle name permission denied.\n";
+const std::string STRING_INSTALL_EXISTED_BUNDLE_BY_BUNDLE_NAME_SYSTEM_API_DENIED =
+    "error: install existed bundle by bundle name system api denied.\n";
+const std::string STRING_INVALID_USER_ID = "error: invalid user id.\n";
 
 const std::string STRING_GET_STRING_NG = "error: failed to get label \n";
 
@@ -1537,6 +1563,7 @@ const std::string SET_RM = "setrm";
 const std::string INSTALL_SANDBOX = "installSandbox";
 const std::string UNINSTALL_SANDBOX = "uninstallSandbox";
 const std::string DUMP_SANDBOX = "dumpSandbox";
+const std::string INSTALL_EXISTED_BUNDLE_BY_BUNDLE_NAME = "installExistedBundleByBundleName";
 const std::string UNINSTALL_PREINSTALL_BUNDLE = "uninstallPreInstallBundle";
 
 const std::string SHORT_OPTIONS = "hn:m:a:d:u:i:";
@@ -1548,6 +1575,16 @@ const struct option LONG_OPTIONS[] = {
     {"device-id", required_argument, nullptr, 'd'},
     {"user-id", required_argument, nullptr, 'u'},
     {"is-removable", required_argument, nullptr, 'i'},
+    {nullptr, 0, nullptr, 0},
+};
+
+const std::string SHORT_OPTIONS_INSTALL_EXISTED_BUNDLE = "hn:u:r:p:";
+const struct option LONG_OPTIONS_INSTALL_EXISTED_BUNDLE[] = {
+    {"help", no_argument, nullptr, 'h'},
+    {"bundle-name", required_argument, nullptr, 'n'},
+    {"user-id", required_argument, nullptr, 'u'},
+    {"reload-token", required_argument, nullptr, 'r'},
+    {"extra-perms", required_argument, nullptr, 'p'},
     {nullptr, 0, nullptr, 0},
 };
 
@@ -2439,6 +2476,8 @@ ErrCode BundleTestTool::CreateCommandMap()
         {"getrm", std::bind(&BundleTestTool::RunAsGetRemovableCommand, this)},
         {"installSandbox", std::bind(&BundleTestTool::RunAsInstallSandboxCommand, this)},
         {"uninstallSandbox", std::bind(&BundleTestTool::RunAsUninstallSandboxCommand, this)},
+        {"installExistedBundleByBundleName",
+            std::bind(&BundleTestTool::RunAsInstallExistedBundleByBundleNameCommand, this)},
         {"dumpSandbox", std::bind(&BundleTestTool::RunAsDumpSandboxCommand, this)},
         {"getStr", std::bind(&BundleTestTool::RunAsGetStringCommand, this)},
         {"getIcon", std::bind(&BundleTestTool::RunAsGetIconCommand, this)},
@@ -3288,6 +3327,139 @@ ErrCode BundleTestTool::RunAsDumpSandboxCommand()
         resultReceiver_.append(STRING_DUMP_SANDBOX_FAILED + "errCode is "+ std::to_string(ret) + "\n");
     }
     return result;
+}
+
+ErrCode BundleTestTool::InstallExistedBundleByBundleNameOperation(
+    const std::string &bundleName, const int32_t userId) const
+{
+    APP_LOGI("InstallExistedBundleByBundleNameOperation bundleName:%{public}s, userId:%{public}d",
+        bundleName.c_str(), userId);
+    if (bundleInstallerProxy_ == nullptr) {
+        APP_LOGE("bundleInstallerProxy_ is null");
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    return bundleInstallerProxy_->InstallExistedBundleByBundleName(bundleName, userId);
+}
+
+ErrCode BundleTestTool::HandleInstallExistedBundleByBundleNameOption(int32_t option, std::string &bundleName,
+    int32_t &userId, bool &userIdSpecified, bool &reloadToken, std::vector<const char*> &extraPerms,
+    std::string &extraPermsMode, bool &helpShown)
+{
+    if (option == 'h') {
+        resultReceiver_.append(HELP_MSG_INSTALL_EXISTED_BUNDLE_BY_BUNDLE_NAME);
+        helpShown = true;
+        return OHOS::ERR_OK;
+    }
+    if (option == 'n') { bundleName = optarg; return OHOS::ERR_OK; }
+    if (option == 'u') {
+        if (!OHOS::StrToInt(std::string(optarg), userId)) {
+            resultReceiver_.append(STRING_INVALID_USER_ID + "\n");
+            return OHOS::ERR_INVALID_VALUE;
+        }
+        userIdSpecified = true;
+        return OHOS::ERR_OK;
+    }
+    if (option == 'r') {
+        std::string v = optarg;
+        if (v == "true" || v == "1") { reloadToken = true; return OHOS::ERR_OK; }
+        if (v == "false" || v == "0") { reloadToken = false; return OHOS::ERR_OK; }
+        resultReceiver_.append("error: reload-token must be true/false or 1/0.\n");
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    if (option == 'p') {
+        static const std::map<std::string, std::pair<std::vector<const char*>, std::string>> modes = {
+            {"all", {{"ohos.permission.INSTALL_EXISTED_BUNDLE", "ohos.permission.INTERACT_ACROSS_LOCAL_ACCOUNTS"}, "all"}},
+            {"install", {{"ohos.permission.INSTALL_EXISTED_BUNDLE"}, "install"}},
+            {"cross", {{"ohos.permission.INTERACT_ACROSS_LOCAL_ACCOUNTS"}, "cross"}},
+            {"none", {{}, "none"}},
+        };
+        auto it = modes.find(optarg);
+        if (it == modes.end()) {
+            resultReceiver_.append("error: extra-perms must be all/install/cross/none.\n");
+            return OHOS::ERR_INVALID_VALUE;
+        }
+        extraPerms = it->second.first;
+        extraPermsMode = it->second.second;
+        return OHOS::ERR_OK;
+    }
+    return OHOS::ERR_INVALID_VALUE;
+}
+
+ErrCode BundleTestTool::ParseInstallExistedBundleByBundleNameArgs(std::string &bundleName, int32_t &userId,
+    bool &userIdSpecified, bool &reloadToken, std::vector<const char*> &extraPerms, std::string &extraPermsMode)
+{
+    int result = OHOS::ERR_OK;
+    bool helpShown = false;
+    int32_t option = 0;
+    while ((option = getopt_long(argc_, argv_, SHORT_OPTIONS_INSTALL_EXISTED_BUNDLE.c_str(),
+        LONG_OPTIONS_INSTALL_EXISTED_BUNDLE, nullptr)) != -1) {
+        APP_LOGD("option: %{public}d, optopt: %{public}d, optind: %{public}d", option, optopt, optind);
+        if (optind < 0 || optind > argc_) { return OHOS::ERR_INVALID_VALUE; }
+        result = HandleInstallExistedBundleByBundleNameOption(option, bundleName, userId, userIdSpecified, reloadToken,
+            extraPerms, extraPermsMode, helpShown);
+        if (helpShown) { return OHOS::ERR_OK; }
+        if (result != OHOS::ERR_OK) { break; }
+    }
+    if (result == OHOS::ERR_OK && bundleName.empty()) {
+        resultReceiver_.append(HELP_MSG_NO_BUNDLE_NAME_OPTION);
+        result = OHOS::ERR_INVALID_VALUE;
+    }
+    if (result == OHOS::ERR_OK && !userIdSpecified) {
+        resultReceiver_.append(STRING_INVALID_USER_ID + "\n");
+        result = OHOS::ERR_INVALID_VALUE;
+    }
+    if (result != OHOS::ERR_OK) {
+        resultReceiver_.append(HELP_MSG_INSTALL_EXISTED_BUNDLE_BY_BUNDLE_NAME);
+    }
+    return result;
+}
+
+void BundleTestTool::AppendInstallExistedBundleByBundleNameResult(ErrCode ret, bool reloadToken,
+    const std::string &extraPermsMode)
+{
+    if (ret == ERR_OK) {
+        resultReceiver_.append(STRING_INSTALL_EXISTED_BUNDLE_BY_BUNDLE_NAME_SUCCESSFULLY);
+    } else if (ret == ERR_APPEXECFWK_PERMISSION_DENIED) {
+        resultReceiver_.append(STRING_INSTALL_EXISTED_BUNDLE_BY_BUNDLE_NAME_PERMISSION_DENIED +
+            "errCode is " + std::to_string(ret) + "\n");
+        resultReceiver_.append("note: server returns 8519925 for missing INSTALL_EXISTED_BUNDLE or "
+            "INTERACT_ACROSS_LOCAL_ACCOUNTS (cross-user)\n");
+        resultReceiver_.append("note: reload-token=" + std::string(reloadToken ? "true" : "false") +
+            ", extra-perms=" + extraPermsMode +
+            " (install=ohos.permission.INSTALL_EXISTED_BUNDLE, cross=ohos.permission.INTERACT_ACROSS_LOCAL_ACCOUNTS)\n");
+    } else if (ret == ERR_BUNDLE_MANAGER_SYSTEM_API_DENIED) {
+        resultReceiver_.append(STRING_INSTALL_EXISTED_BUNDLE_BY_BUNDLE_NAME_SYSTEM_API_DENIED +
+            "errCode is " + std::to_string(ret) + "\n");
+    } else {
+        resultReceiver_.append(STRING_INSTALL_EXISTED_BUNDLE_BY_BUNDLE_NAME_FAILED + "errCode is " +
+            std::to_string(ret) + "\n");
+    }
+}
+
+ErrCode BundleTestTool::RunAsInstallExistedBundleByBundleNameCommand()
+{
+    std::string bundleName;
+    int32_t userId = Constants::UNSPECIFIED_USERID;
+    bool userIdSpecified = false;
+    bool reloadToken = true;
+    std::vector<const char*> extraPerms = {
+        "ohos.permission.INSTALL_EXISTED_BUNDLE",
+        "ohos.permission.INTERACT_ACROSS_LOCAL_ACCOUNTS",
+    };
+    std::string extraPermsMode = "all";
+
+    ErrCode result = ParseInstallExistedBundleByBundleNameArgs(
+        bundleName, userId, userIdSpecified, reloadToken, extraPerms, extraPermsMode);
+    if (result != OHOS::ERR_OK) {
+        return result;
+    }
+    if (bundleName.empty()) { // -h handled inside parse (help appended)
+        return OHOS::ERR_OK;
+    }
+    if (reloadToken) { ReloadNativeTokenInfo(extraPerms); }
+    ErrCode ret = InstallExistedBundleByBundleNameOperation(bundleName, userId);
+    AppendInstallExistedBundleByBundleNameResult(ret, reloadToken, extraPermsMode);
+    return (ret == ERR_OK) ? OHOS::ERR_OK : ret;
 }
 
 ErrCode BundleTestTool::RunAsUninstallEnterpriseReSignCert()
@@ -7168,31 +7340,43 @@ bool BundleTestTool::ProcessAppDistributionTypeEnums(std::vector<std::string> ap
 
 void BundleTestTool::ReloadNativeTokenInfo(bool manageHapToken)
 {
-    const int32_t permsNum = 9;
+    ReloadNativeTokenInfo(std::vector<const char*> {}, manageHapToken);
+}
+
+void BundleTestTool::ReloadNativeTokenInfo(const std::vector<const char*> &extraPerms, bool manageHapToken)
+{
+    std::vector<const char*> perms = {
+        "ohos.permission.MANAGE_EDM_POLICY",
+        "ohos.permission.MANAGE_DISPOSED_APP_STATUS",
+        "ohos.permission.GET_BUNDLE_INFO_PRIVILEGED",
+        "ohos.permission.GET_INSTALLED_BUNDLE_LIST",
+        "ohos.permission.SET_DEFAULT_APPLICATION",
+        "ohos.permission.GET_BUNDLE_RESOURCES",
+        "ohos.permission.REMOVE_CACHE_FILES",
+        "ohos.permission.CHANGE_ABILITY_ENABLED_STATE",
+    };
+    if (manageHapToken) {
+        perms.emplace_back("ohos.permission.MANAGE_HAP_TOKENID");
+    }
+    for (const auto *perm : extraPerms) {
+        if (perm != nullptr) {
+            perms.emplace_back(perm);
+        }
+    }
     uint64_t tokenId;
-    const char *perms[permsNum];
-    perms[0] = "ohos.permission.MANAGE_EDM_POLICY";
-    perms[1] = "ohos.permission.MANAGE_DISPOSED_APP_STATUS";
-    perms[2] = "ohos.permission.GET_BUNDLE_INFO_PRIVILEGED";
-    perms[3] = "ohos.permission.GET_INSTALLED_BUNDLE_LIST";
-    perms[4] = "ohos.permission.SET_DEFAULT_APPLICATION";
-    perms[5] = "ohos.permission.GET_BUNDLE_RESOURCES";
-    perms[6] = "ohos.permission.REMOVE_CACHE_FILES";
-    perms[7] = "ohos.permission.CHANGE_ABILITY_ENABLED_STATE";
-    perms[8] = "ohos.permission.MANAGE_HAP_TOKENID";
     NativeTokenInfoParams infoInstance = {
         .dcapsNum = 0,
-        .permsNum = manageHapToken ? permsNum : permsNum - 1,
+        .permsNum = static_cast<int32_t>(perms.size()),
         .aclsNum = 0,
-        .dcaps = NULL,
-        .perms = perms,
-        .acls = NULL,
+        .dcaps = nullptr,
+        .perms = perms.data(),
+        .acls = nullptr,
         .processName = "bundleTestToolProcess",
         .aplStr = "system_core",
     };
     tokenId = GetAccessTokenId(&infoInstance);
     SetSelfTokenID(tokenId);
-    APP_LOGI("RunAsSetAppDistributionTypes ReloadNativeTokenInfo");
+    APP_LOGI("ReloadNativeTokenInfo permsNum:%{public}d", infoInstance.permsNum);
     OHOS::Security::AccessToken::AccessTokenKit::ReloadNativeTokenInfo();
 }
 
