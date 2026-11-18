@@ -36,19 +36,30 @@ QuickFixStatusCallbackHostlmpl::~QuickFixStatusCallbackHostlmpl()
 void QuickFixStatusCallbackHostlmpl::OnPatchDeployed(const std::shared_ptr<QuickFixResult> &result)
 {
     APP_LOGD("on Patch deployed result is %{public}s", result->ToString().c_str());
-    quickFixPromise_.set_value(result);
+    SetResult(result);
 }
 
 void QuickFixStatusCallbackHostlmpl::OnPatchSwitched(const std::shared_ptr<QuickFixResult> &result)
 {
     APP_LOGD("on Patch switched result is %{public}s", result->ToString().c_str());
-    quickFixPromise_.set_value(result);
+    SetResult(result);
 }
 
 void QuickFixStatusCallbackHostlmpl::OnPatchDeleted(const std::shared_ptr<QuickFixResult> &result)
 {
     APP_LOGD("on Patch deleted result is %{public}s", result->ToString().c_str());
+    SetResult(result);
+}
+
+void QuickFixStatusCallbackHostlmpl::SetResult(const std::shared_ptr<QuickFixResult> &result)
+{
+    std::lock_guard<std::mutex> lock(setValueMutex_);
+    if (isSetValue_) {
+        APP_LOGW("quick fix result is already set");
+        return;
+    }
     quickFixPromise_.set_value(result);
+    isSetValue_ = true;
 }
 
 ErrCode QuickFixStatusCallbackHostlmpl::GetResultCode(std::shared_ptr<QuickFixResult> &quickFixRes) const
