@@ -299,6 +299,7 @@ static const std::string HELP_MSG =
     "  getTopNLargestItemsInAppDataDir  get top N largest items in app data dir\n"
     "  parseSpmModule                   parse spm module\n"
     "  getSandboxDataDirName            get the sandbox data directory name\n"
+    "  getExtensionSandboxDataDir       get the extension sandbox directory\n"
     "  getMainAndCloneBundleInfo        get main and clone bundle info\n"
     "  querySandboxCloneAbilityInfo     query sandbox clone ability info\n"
     "  filterBundleListByDeviceModeDistributionPolicies  filter bundle list by device mode "
@@ -943,6 +944,15 @@ const std::string HELP_MSG_GET_DIR_BY_BUNDLENAME_AND_APP_INDEX =
     "  -n, --bundle-name <bundle-name>        specify bundle name of the application\n"
     "  -a, --app-index <app-index>            specify a app index\n";
 
+const std::string HELP_MSG_GET_EXTENSION_SANDBOX_DATA_DIR =
+    "usage: bundle_test_tool getExtensionSandboxDataDir <options>\n"
+    "eg:bundle_test_tool getExtensionSandboxDataDir -e <extension-name> [-i <caller-uid>]\n"
+    "options list:\n"
+    "  -h, --help                             list available commands\n"
+    "  -e, --extension-name <extension-name>  specify extension name\n"
+    "  -i, --uid <caller-uid>                 set caller effective UID (requires privilege);\n"
+    "                                         omitted: keep the current UID\n";
+
 const std::string HELP_MSG_GET_ALL_BUNDLE_DIRS =
     "usage: bundle_test_tool getAllBundleDirs <options>\n"
     "eg:bundle_test_tool getAllBundleDirs -u <user-id>\n"
@@ -1395,6 +1405,8 @@ const std::string STRING_GET_ODID_RESET_COUNT_NG = "getOdidResetCount failed\n";
 
 const std::string STRING_GET_DIR_OK = "getDirByBundleNameAndAppIndex successfully\n";
 const std::string STRING_GET_DIR_NG = "getDirByBundleNameAndAppIndex failed\n";
+const std::string STRING_GET_EXTENSION_SANDBOX_DATA_DIR_OK = "getExtensionSandboxDataDir successfully\n";
+const std::string STRING_GET_EXTENSION_SANDBOX_DATA_DIR_NG = "getExtensionSandboxDataDir failed\n";
 
 const std::string STRING_GET_ALL_BUNDLE_DIRS_OK = "getAllBundleDirs successfully\n";
 const std::string STRING_GET_ALL_BUNDLE_DIRS_NG = "getAllBundleDirs failed\n";
@@ -1969,6 +1981,14 @@ const struct option LONG_OPTIONS_GET_ALL_BUNDLE_DIRS[] = {
     {nullptr, 0, nullptr, 0},
 };
 
+const std::string SHORT_OPTIONS_GET_EXTENSION_SANDBOX_DATA_DIR = "he:i:";
+const struct option LONG_OPTIONS_GET_EXTENSION_SANDBOX_DATA_DIR[] = {
+    {"help", no_argument, nullptr, 'h'},
+    {"extension-name", required_argument, nullptr, 'e'},
+    {"uid", required_argument, nullptr, 'i'},
+    {nullptr, 0, nullptr, 0},
+};
+
 const std::string SHORT_OPTIONS_GET_ALL_JSON_PROFILE = "hp:u:";
 const struct option LONG_OPTIONS_GET_ALL_JSON_PROFILE[] = {
     {"help", no_argument, nullptr, 'h'},
@@ -2419,6 +2439,8 @@ ErrCode BundleTestTool::CreateCommandMap()
             std::bind(&BundleTestTool::RunAsUpdateAppEncryptedStatus, this)},
         {"getDirByBundleNameAndAppIndex",
             std::bind(&BundleTestTool::RunAsGetDirByBundleNameAndAppIndex, this)},
+        {"getExtensionSandboxDataDir",
+            std::bind(&BundleTestTool::RunAsGetExtensionSandboxDataDir, this)},
         {"getAllBundleDirs",
             std::bind(&BundleTestTool::RunAsGetAllBundleDirs, this)},
         {"getAllJsonProfile",
@@ -8368,6 +8390,110 @@ ErrCode BundleTestTool::RunAsGetDirByBundleNameAndAppIndex()
         } else {
             resultReceiver_.append(STRING_GET_DIR_NG + "errCode is "+ std::to_string(result) + "\n");
         }
+    }
+    return result;
+}
+
+ErrCode BundleTestTool::ParseGetExtensionSandboxDataDirArgs(
+    std::string &extensionName, int32_t &callerUid, bool &showHelp)
+{
+    showHelp = false;
+    callerUid = Constants::INVALID_UID;
+    int32_t result = OHOS::ERR_OK;
+    int32_t counter = 0;
+    while (true) {
+        counter++;
+        int32_t option = getopt_long(argc_, argv_, SHORT_OPTIONS_GET_EXTENSION_SANDBOX_DATA_DIR.c_str(),
+            LONG_OPTIONS_GET_EXTENSION_SANDBOX_DATA_DIR, nullptr);
+        APP_LOGD("option: %{public}d, optopt: %{public}d, optind: %{public}d", option, optopt, optind);
+        if (optind < 0 || optind > argc_) {
+            return OHOS::ERR_INVALID_VALUE;
+        }
+        if (option == -1) {
+            if ((counter == 1) && optind < argc_ && strcmp(argv_[optind], cmd_.c_str()) == 0) {
+                resultReceiver_.append(HELP_MSG_GET_EXTENSION_SANDBOX_DATA_DIR);
+                return OHOS::ERR_INVALID_VALUE;
+            }
+            break;
+        }
+        switch (option) {
+            case 'h':
+                resultReceiver_.append(HELP_MSG_GET_EXTENSION_SANDBOX_DATA_DIR);
+                showHelp = true;
+                return ERR_OK;
+            case 'e':
+                extensionName = optarg == nullptr ? "" : optarg;
+                break;
+            case 'i':
+                if (optarg == nullptr || !OHOS::StrToInt(optarg, callerUid) || callerUid < 0) {
+                    return OHOS::ERR_INVALID_VALUE;
+                }
+                break;
+            default:
+                result = OHOS::ERR_INVALID_VALUE;
+                break;
+        }
+        if (result != OHOS::ERR_OK) {
+            break;
+        }
+    }
+    if (result != OHOS::ERR_OK) {
+        return result;
+    }
+    if (extensionName.empty()) {
+        return ERR_BUNDLE_MANAGER_PARAM_ERROR;
+    }
+    return ERR_OK;
+}
+
+ErrCode BundleTestTool::RunAsGetExtensionSandboxDataDir()
+{
+    APP_LOGI("RunAsGetExtensionSandboxDataDir start");
+    std::string extensionName;
+    bool showHelp = false;
+    int32_t callerUid = Constants::INVALID_UID;
+    auto result = ParseGetExtensionSandboxDataDirArgs(extensionName, callerUid, showHelp);
+    if (showHelp) {
+        return ERR_OK;
+    }
+    if (result != ERR_OK) {
+        resultReceiver_.append(STRING_GET_EXTENSION_SANDBOX_DATA_DIR_NG);
+        resultReceiver_.append("errCode is " + std::to_string(result) + "\n");
+        return result;
+    }
+
+    std::string dir;
+    if (bundleMgrProxy_ == nullptr) {
+        resultReceiver_.append(STRING_GET_EXTENSION_SANDBOX_DATA_DIR_NG);
+        resultReceiver_.append("errCode is " + std::to_string(OHOS::ERR_INVALID_VALUE) + "\n");
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    result = GetExtensionSandboxDataDirWithUid(extensionName, callerUid, dir);
+    if (result == ERR_OK) {
+        resultReceiver_.append(STRING_GET_EXTENSION_SANDBOX_DATA_DIR_OK);
+        resultReceiver_.append(dir + "\n");
+    } else {
+        resultReceiver_.append(STRING_GET_EXTENSION_SANDBOX_DATA_DIR_NG);
+        resultReceiver_.append("errCode is " + std::to_string(result) + "\n");
+    }
+    return result;
+}
+
+ErrCode BundleTestTool::GetExtensionSandboxDataDirWithUid(
+    const std::string &extensionName, int32_t callerUid, std::string &dir)
+{
+    ReloadNativeTokenInfo();
+    const uid_t originalEuid = geteuid();
+    if (callerUid != Constants::INVALID_UID && seteuid(static_cast<uid_t>(callerUid)) != 0) {
+        APP_LOGE("failed to set effective uid to %{public}d", callerUid);
+        resultReceiver_.append(STRING_SET_EUID_FAILED);
+        return OHOS::ERR_INVALID_VALUE;
+    }
+    ErrCode result = bundleMgrProxy_->GetExtensionSandboxDataDir(extensionName, dir);
+    if (callerUid != Constants::INVALID_UID && seteuid(originalEuid) != 0) {
+        APP_LOGE("failed to restore effective uid after GetExtensionSandboxDataDir");
+        resultReceiver_.append("error: failed to restore effective uid\n");
+        return OHOS::ERR_INVALID_VALUE;
     }
     return result;
 }

@@ -32,6 +32,8 @@ const std::string MOCK_LABEL_LIST =
 
 bool g_getBundleInfosResult = true;
 bool g_getBundleStatsFailSecondBundle = false;
+ErrCode g_getExtensionSandboxDataDirResult = ERR_OK;
+std::string g_extensionSandboxDir;
 } // namespace
 
 void MockBundleMgrHost::SetGetBundleInfosReturn(bool result)
@@ -42,6 +44,12 @@ void MockBundleMgrHost::SetGetBundleInfosReturn(bool result)
 void MockBundleMgrHost::SetGetBundleStatsFailSecondBundle(bool enable)
 {
     g_getBundleStatsFailSecondBundle = enable;
+}
+
+void MockBundleMgrHost::SetGetExtensionSandboxDataDirResult(ErrCode result, const std::string &dir)
+{
+    g_getExtensionSandboxDataDirResult = result;
+    g_extensionSandboxDir = dir;
 }
 
 bool MockBundleMgrHost::DumpInfos(
@@ -60,6 +68,12 @@ bool MockBundleMgrHost::DumpInfos(
         result = "OK";
     }
     return true;
+}
+
+ErrCode MockBundleMgrHost::GetExtensionSandboxDataDir(const std::string &extensionName, std::string &dir)
+{
+    dir = g_extensionSandboxDir;
+    return g_getExtensionSandboxDataDirResult;
 }
 
 ErrCode MockBundleMgrHost::CleanBundleCacheFiles(const std::string &bundleName,
