@@ -227,6 +227,8 @@ std::map<int32_t, std::string> BundleCommandCommon::bundleMessageMap_ = {
     { IStatusReceiver::ERR_INSTALL_FAILED_DEVICE_UNAUTHORIZED,
         "error: Failed to install the HAP because the device is unauthorized, "
         "make sure the UDID of your device is configured in the signing profile." },
+    { IStatusReceiver::ERR_INSTALL_DEDUP_SO_LINK_FAILED,
+        "error: install failed due to dedup so link failed." },
     // CLI sandbox app uninstall error codes
     { ERR_APPEXECFWK_CLI_SANDBOX_UNINSTALL_INTERNAL_ERROR, "error: cli sandbox app uninstall internal error." },
     { ERR_APPEXECFWK_CLI_SANDBOX_UNINSTALL_INVALID_BUNDLE_NAME,

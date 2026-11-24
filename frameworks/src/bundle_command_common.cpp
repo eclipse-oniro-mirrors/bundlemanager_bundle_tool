@@ -789,6 +789,10 @@ std::map<int32_t, std::string> BundleCommandCommon::bundleMessageMap_ = {
     {
         IStatusReceiver::ERR_INSTALL_GRANT_PERMISSION_NOT_DEBUG_BUNDLE,
         "error: Failed to install because the bundle must be debug type."
+    },
+    {
+        IStatusReceiver::ERR_INSTALL_DEDUP_SO_LINK_FAILED,
+        "error: install failed due to dedup so link failed."
     }
 };
 } // AppExecFwk
