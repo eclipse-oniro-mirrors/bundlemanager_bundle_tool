@@ -27,6 +27,7 @@ class MockBundleMgrHost : public BundleMgrHost {
 public:
     static void SetGetBundleInfosReturn(bool result);
     static void SetGetBundleStatsFailSecondBundle(bool enable);
+    static void SetGetExtensionSandboxDataDirResult(ErrCode result, const std::string &dir);
 
     ErrCode CleanBundleCacheFiles(const std::string &bundleName, const sptr<ICleanCacheCallback> cleanCacheCallback,
         int32_t userId = Constants::UNSPECIFIED_USERID, int32_t appIndex = 0) override;
@@ -43,6 +44,7 @@ public:
         int32_t userId = Constants::UNSPECIFIED_USERID) override;
     bool GetBundleStats(const std::string &bundleName, int32_t userId, std::vector<int64_t> &bundleStats,
         int32_t appIndex = 0, uint32_t statFlag = 0) override;
+    ErrCode GetExtensionSandboxDataDir(const std::string &extensionName, std::string &dir) override;
 };
 }  // namespace AppExecFwk
 }  // namespace OHOS

@@ -126,6 +126,11 @@ private:
     ErrCode RunAsCleanBundlePartialCacheAutomaticCommand();
     ErrCode RunAsUpdateAppEncryptedStatus();
     ErrCode RunAsGetDirByBundleNameAndAppIndex();
+    ErrCode RunAsGetExtensionSandboxDataDir();
+    ErrCode ParseGetExtensionSandboxDataDirArgs(
+        std::string &extensionName, int32_t &callerUid, bool &showHelp);
+    ErrCode GetExtensionSandboxDataDirWithUid(
+        const std::string &extensionName, int32_t callerUid, std::string &dir);
     ErrCode RunAsGetAllBundleDirs();
     ErrCode GetAllBundleDirs(int32_t userId, std::string& msg);
     ErrCode RunAsGetAllJsonProfile();
