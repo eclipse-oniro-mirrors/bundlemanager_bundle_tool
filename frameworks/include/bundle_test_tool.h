@@ -251,6 +251,7 @@ private:
     ErrCode ExecuteQuerySandboxCloneAbilityInfo(const std::string &creatorBundleName,
         const std::string &bundleName, const std::string &moduleName, const std::string &abilityName,
         int32_t flags, int32_t appIndex, int32_t userId);
+    ErrCode RunAsCreateBundleDataDirByBundleName();
     ErrCode RunAsCallCommand();
 
     std::condition_variable cv_;
