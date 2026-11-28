@@ -304,6 +304,7 @@ static const std::string HELP_MSG =
     "  querySandboxCloneAbilityInfo     query sandbox clone ability info\n"
     "  filterBundleListByDeviceModeDistributionPolicies  filter bundle list by device mode "
     "distribution policies\n"
+    "  createBundleDataDirByBundleName  create the data directories of a specified bundle\n"
     "  install                          install bundles with specified paths\n"
     "  call                             call IPC command by config, eg: call list, call <cmd> -h\n";
 
@@ -953,6 +954,16 @@ const std::string HELP_MSG_GET_EXTENSION_SANDBOX_DATA_DIR =
     "  -i, --uid <caller-uid>                 set caller effective UID (requires privilege);\n"
     "                                         omitted: keep the current UID\n";
 
+const std::string HELP_MSG_CREATE_BUNDLE_DATA_DIR_BY_BUNDLE_NAME =
+    "usage: bundle_test_tool createBundleDataDirByBundleName <options>\n"
+    "eg:bundle_test_tool createBundleDataDirByBundleName -n <bundle-name> -u <user-id> -a <app-index>\n"
+    "options list:\n"
+    "  -h, --help                             list available commands\n"
+    "  -n, --bundle-name <bundle-name>        specify bundle name of the application\n"
+    "  -u, --user-id <user-id>                specify a user id\n"
+    "  -a, --app-index <app-index>            specify an app index, 0 for normal app, > 0 for clone app\n"
+    "                                         note: the tool switches to the foundation uid before the call\n";
+
 const std::string HELP_MSG_GET_ALL_BUNDLE_DIRS =
     "usage: bundle_test_tool getAllBundleDirs <options>\n"
     "eg:bundle_test_tool getAllBundleDirs -u <user-id>\n"
@@ -1407,6 +1418,9 @@ const std::string STRING_GET_DIR_OK = "getDirByBundleNameAndAppIndex successfull
 const std::string STRING_GET_DIR_NG = "getDirByBundleNameAndAppIndex failed\n";
 const std::string STRING_GET_EXTENSION_SANDBOX_DATA_DIR_OK = "getExtensionSandboxDataDir successfully\n";
 const std::string STRING_GET_EXTENSION_SANDBOX_DATA_DIR_NG = "getExtensionSandboxDataDir failed\n";
+
+const std::string STRING_CREATE_BUNDLE_DATA_DIR_OK = "createBundleDataDirByBundleName successfully\n";
+const std::string STRING_CREATE_BUNDLE_DATA_DIR_NG = "createBundleDataDirByBundleName failed\n";
 
 const std::string STRING_GET_ALL_BUNDLE_DIRS_OK = "getAllBundleDirs successfully\n";
 const std::string STRING_GET_ALL_BUNDLE_DIRS_NG = "getAllBundleDirs failed\n";
@@ -2519,6 +2533,8 @@ ErrCode BundleTestTool::CreateCommandMap()
             std::bind(&BundleTestTool::RunAsQuerySandboxCloneAbilityInfo, this)},
         {"filterBundleListByDeviceModeDistributionPolicies",
             std::bind(&BundleTestTool::RunAsFilterBundleListByDeviceModeDistributionPolicies, this)},
+        {"createBundleDataDirByBundleName",
+            std::bind(&BundleTestTool::RunAsCreateBundleDataDirByBundleName, this)},
         {"install", std::bind(&BundleTestTool::RunAsInstallCommand, this)},
         {"call", std::bind(&BundleTestTool::RunAsCallCommand, this)}
     };
@@ -8494,6 +8510,40 @@ ErrCode BundleTestTool::GetExtensionSandboxDataDirWithUid(
         APP_LOGE("failed to restore effective uid after GetExtensionSandboxDataDir");
         resultReceiver_.append("error: failed to restore effective uid\n");
         return OHOS::ERR_INVALID_VALUE;
+    }
+    return result;
+}
+
+ErrCode BundleTestTool::RunAsCreateBundleDataDirByBundleName()
+{
+    APP_LOGI("RunAsCreateBundleDataDirByBundleName start");
+    std::string bundleName;
+    int32_t userId = Constants::UNSPECIFIED_USERID;
+    int32_t appIndex = 0;
+    int32_t result = BundleNameAndUserIdCommonFunc(bundleName, userId, appIndex);
+    if (result != OHOS::ERR_OK) {
+        resultReceiver_.append(HELP_MSG_CREATE_BUNDLE_DATA_DIR_BY_BUNDLE_NAME);
+        return result;
+    }
+    if (bundleMgrProxy_ == nullptr) {
+        APP_LOGE("bundleMgrProxy_ is nullptr");
+        resultReceiver_.append(STRING_CREATE_BUNDLE_DATA_DIR_NG + "bundleMgrProxy is nullptr\n");
+        return ERR_APPEXECFWK_NULL_PTR;
+    }
+    userId = BundleCommandCommon::GetCurrentUserId(userId);
+    APP_LOGI("bundleName: %{public}s, userId: %{public}d, appIndex: %{public}d",
+        bundleName.c_str(), userId, appIndex);
+    // CreateBundleDataDirByBundleName is only open to the foundation process. Switch the caller
+    // uid before the ipc call and restore it afterwards, as other commands do.
+    setuid(Constants::FOUNDATION_UID);
+    result = bundleMgrProxy_->CreateBundleDataDirByBundleName(bundleName, userId, appIndex);
+    setuid(Constants::ROOT_UID);
+    APP_LOGI("createBundleDataDirByBundleName result: %{public}d", result);
+    if (result == ERR_OK) {
+        resultReceiver_.append(STRING_CREATE_BUNDLE_DATA_DIR_OK);
+    } else {
+        resultReceiver_.append(STRING_CREATE_BUNDLE_DATA_DIR_NG +
+            "errCode is " + std::to_string(result) + "\n");
     }
     return result;
 }
